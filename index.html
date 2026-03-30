@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Schranke">
+<meta name="theme-color" content="#0a0a0a">
+<title>Schranke – Mitscherlichstraße</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --red: #ff2d2d;
+    --red-dim: #4a0000;
+    --green: #00e676;
+    --green-dim: #003318;
+    --yellow: #ffb300;
+    --text: #f0f0f0;
+    --muted: #555;
+    --font-mono: 'JetBrains Mono', monospace;
+    --font-display: 'Syne', sans-serif;
+  }
+
+- { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+body {
+background: var(–bg);
+color: var(–text);
+font-family: var(–font-mono);
+min-height: 100vh;
+min-height: 100dvh;
+overflow-x: hidden;
+padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ── STATUS HERO ── */
+#hero {
+position: relative;
+padding: 60px 24px 40px;
+text-align: center;
+overflow: hidden;
+}
+
+#hero::before {
+content: ‘’;
+position: absolute;
+inset: 0;
+background: radial-gradient(ellipse 80% 60% at 50% 0%, var(–hero-glow, #4a000066) 0%, transparent 70%);
+pointer-events: none;
+transition: background 0.8s ease;
+}
+
+.status-label {
+font-family: var(–font-display);
+font-size: 11px;
+font-weight: 700;
+letter-spacing: 4px;
+text-transform: uppercase;
+color: var(–muted);
+margin-bottom: 16px;
+}
+
+.status-main {
+font-family: var(–font-display);
+font-size: 52px;
+font-weight: 800;
+line-height: 1;
+letter-spacing: -2px;
+margin-bottom: 8px;
+transition: color 0.5s ease;
+}
+
+.status-main.closed { color: var(–red); }
+.status-main.open { color: var(–green); }
+
+.status-countdown {
+font-family: var(–font-mono);
+font-size: 28px;
+font-weight: 700;
+letter-spacing: 2px;
+min-height: 40px;
+transition: color 0.5s ease;
+}
+
+.status-countdown.closed { color: var(–red); }
+.status-countdown.open { color: var(–green); }
+
+.next-event {
+margin-top: 12px;
+font-size: 12px;
+color: var(–muted);
+letter-spacing: 1px;
+}
+
+/* ── INDICATOR DOTS ── */
+.indicator {
+display: inline-block;
+width: 10px;
+height: 10px;
+border-radius: 50%;
+margin-right: 6px;
+vertical-align: middle;
+}
+.indicator.closed {
+background: var(–red);
+box-shadow: 0 0 12px var(–red);
+animation: pulse-red 1s ease-in-out infinite;
+}
+.indicator.open {
+background: var(–green);
+box-shadow: 0 0 12px var(–green);
+}
+
+@keyframes pulse-red {
+0%, 100% { opacity: 1; transform: scale(1); }
+50% { opacity: 0.6; transform: scale(0.8); }
+}
+
+/* ── TIMELINE ── */
+#timeline-section {
+padding: 0 24px 24px;
+}
+
+.section-title {
+font-family: var(–font-display);
+font-size: 10px;
+font-weight: 700;
+letter-spacing: 4px;
+text-transform: uppercase;
+color: var(–muted);
+margin-bottom: 16px;
+padding-top: 24px;
+border-top: 1px solid var(–border);
+}
+
+#timeline-bar {
+position: relative;
+height: 48px;
+background: var(–surface);
+border-radius: 6px;
+overflow: hidden;
+border: 1px solid var(–border);
+margin-bottom: 8px;
+}
+
+.timeline-segment {
+position: absolute;
+top: 0;
+height: 100%;
+transition: opacity 0.3s;
+}
+
+.timeline-segment.closed-seg {
+background: var(–red);
+opacity: 0.85;
+}
+
+.timeline-segment.now-line {
+width: 2px;
+background: white;
+opacity: 0.9;
+z-index: 10;
+}
+
+.timeline-labels {
+display: flex;
+justify-content: space-between;
+font-size: 10px;
+color: var(–muted);
+letter-spacing: 1px;
+}
+
+/* ── LIST ── */
+#list-section {
+padding: 0 24px 40px;
+}
+
+.closure-item {
+display: flex;
+align-items: center;
+gap: 16px;
+padding: 16px 0;
+border-bottom: 1px solid var(–border);
+}
+
+.closure-item:last-child { border-bottom: none; }
+
+.closure-dot {
+width: 8px;
+height: 8px;
+border-radius: 50%;
+flex-shrink: 0;
+}
+
+.closure-dot.is-now {
+background: var(–red);
+box-shadow: 0 0 8px var(–red);
+animation: pulse-red 1s ease-in-out infinite;
+}
+
+.closure-dot.upcoming { background: var(–yellow); }
+.closure-dot.past { background: var(–muted); }
+
+.closure-time {
+font-size: 15px;
+font-weight: 700;
+letter-spacing: 1px;
+color: var(–text);
+min-width: 110px;
+}
+
+.closure-time.past { color: var(–muted); }
+
+.closure-duration {
+font-size: 11px;
+color: var(–muted);
+margin-top: 2px;
+}
+
+.closure-badge {
+margin-left: auto;
+font-size: 10px;
+font-weight: 700;
+letter-spacing: 2px;
+padding: 4px 10px;
+border-radius: 4px;
+text-transform: uppercase;
+}
+
+.closure-badge.jetzt {
+background: var(–red-dim);
+color: var(–red);
+border: 1px solid var(–red);
+}
+
+.closure-badge.bald {
+background: #332200;
+color: var(–yellow);
+border: 1px solid var(–yellow);
+}
+
+.closure-badge.vorbei {
+background: transparent;
+color: var(–muted);
+border: 1px solid var(–border);
+}
+
+/* ── HEADER ── */
+#header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 16px 24px 0;
+padding-top: calc(16px + env(safe-area-inset-top));
+}
+
+.app-title {
+font-family: var(–font-display);
+font-size: 13px;
+font-weight: 800;
+letter-spacing: 3px;
+text-transform: uppercase;
+color: var(–muted);
+}
+
+.refresh-btn {
+background: var(–surface);
+border: 1px solid var(–border);
+color: var(–muted);
+padding: 8px 14px;
+border-radius: 6px;
+font-family: var(–font-mono);
+font-size: 11px;
+letter-spacing: 1px;
+cursor: pointer;
+transition: all 0.2s;
+}
+
+.refresh-btn:active {
+background: var(–border);
+color: var(–text);
+}
+
+/* ── LOADING / ERROR ── */
+#loading {
+text-align: center;
+padding: 60px 24px;
+color: var(–muted);
+font-size: 13px;
+letter-spacing: 2px;
+}
+
+.loading-dots::after {
+content: ‘’;
+animation: dots 1.5s steps(4, end) infinite;
+}
+
+@keyframes dots {
+0%   { content: ‘’; }
+25%  { content: ‘.’; }
+50%  { content: ‘..’; }
+75%  { content: ‘…’; }
+100% { content: ‘’; }
+}
+
+#error-msg {
+display: none;
+text-align: center;
+padding: 20px 24px;
+color: var(–red);
+font-size: 12px;
+letter-spacing: 1px;
+}
+
+/* ── NOTIFICATION TOGGLE ── */
+#notif-bar {
+margin: 0 24px 8px;
+padding: 12px 16px;
+background: var(–surface);
+border: 1px solid var(–border);
+border-radius: 6px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+font-size: 11px;
+letter-spacing: 1px;
+color: var(–muted);
+}
+
+#notif-btn {
+background: var(–border);
+color: var(–text);
+border: none;
+padding: 6px 12px;
+border-radius: 4px;
+font-family: var(–font-mono);
+font-size: 10px;
+letter-spacing: 1px;
+cursor: pointer;
+transition: all 0.2s;
+}
+
+#notif-btn.active {
+background: var(–green-dim);
+color: var(–green);
+border: 1px solid var(–green);
+}
+
+/* ── DIVIDER ── */
+.divider {
+height: 1px;
+background: var(–border);
+margin: 0 24px;
+}
+
+/* ── INSTALL HINT ── */
+#install-hint {
+display: none;
+margin: 0 24px 16px;
+padding: 12px 16px;
+background: #001a33;
+border: 1px solid #004080;
+border-radius: 6px;
+font-size: 11px;
+color: #4da6ff;
+letter-spacing: 0.5px;
+line-height: 1.6;
+}
+
+.empty-state {
+padding: 40px 0;
+text-align: center;
+color: var(–muted);
+font-size: 12px;
+letter-spacing: 2px;
+}
+</style>
+
+</head>
+<body>
+
+<div id="header">
+  <div class="app-title">Schranke</div>
+  <button class="refresh-btn" onclick="loadData()">↻ Aktualisieren</button>
+</div>
+
+<div id="install-hint">
+  📱 Zum Startbildschirm hinzufügen: Teilen → „Zum Home-Bildschirm"
+</div>
+
+<div id="hero">
+  <div class="status-label">Mitscherlichstraße</div>
+  <div class="status-main" id="status-main">–</div>
+  <div class="status-countdown" id="status-countdown">Lade<span class="loading-dots"></span></div>
+  <div class="next-event" id="next-event"></div>
+</div>
+
+<div id="notif-bar">
+  <span>Benachrichtigungen (10 Min vorher)</span>
+  <button id="notif-btn" onclick="toggleNotifications()">Aktivieren</button>
+</div>
+
+<div id="loading">Lade Zugdaten<span class="loading-dots"></span></div>
+<div id="error-msg">⚠ Fehler beim Laden der Daten</div>
+
+<div id="main-content" style="display:none">
+  <div id="timeline-section">
+    <div class="section-title">Nächste 3 Stunden</div>
+    <div id="timeline-bar"></div>
+    <div class="timeline-labels" id="timeline-labels"></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div id="list-section">
+    <div class="section-title">Schließzeiten</div>
+    <div id="closures-list"></div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──
+const STATION_ID = '8000252'; // Wilhelmshaven Hbf
+const CLOSE_BEFORE_MIN = 3;   // Schranke schließt 3 Min vor Zug
+const OPEN_AFTER_SEC = 10;    // Schranke öffnet 10 Sek nach Zug
+const NOTIF_BEFORE_MIN = 10;  // Benachrichtigung 10 Min vorher
+const WINDOW_HOURS = 3;
+
+let closures = [];
+let timerInterval = null;
+let notifEnabled = false;
+let scheduledNotifs = [];
+
+// ── FETCH TRAIN DATA ──
+async function fetchTrains() {
+  const now = new Date();
+  const durationMin = WINDOW_HOURS * 60 + 30;
+
+  // Fetch both departures and arrivals
+  const [depRes, arrRes] = await Promise.all([
+    fetch(`https://v6.db.transport.rest/stops/${STATION_ID}/departures?duration=${durationMin}&results=50&bus=false&ferry=false&subway=false&tram=false&taxi=false`),
+    fetch(`https://v6.db.transport.rest/stops/${STATION_ID}/arrivals?duration=${durationMin}&results=50&bus=false&ferry=false&subway=false&tram=false&taxi=false`)
+  ]);
+
+  if (!depRes.ok || !arrRes.ok) throw new Error('API Fehler');
+
+  const depData = await depRes.json();
+  const arrData = await arrRes.json();
+
+  const departures = (depData.departures || []).filter(t => t.line && t.line.mode === 'train');
+  const arrivals = (arrData.arrivals || []).filter(t => t.line && t.line.mode === 'train');
+
+  let events = [];
+
+  // Each departure = crossing closes CLOSE_BEFORE_MIN before planned departure
+  for (const dep of departures) {
+    const planned = new Date(dep.plannedWhen || dep.when);
+    const actual = new Date(dep.when || dep.plannedWhen);
+    if (isNaN(actual)) continue;
+    // For departure: train passes crossing when leaving
+    const crossingTime = actual;
+    events.push({ type: 'dep', time: crossingTime, planned });
+  }
+
+  // Each arrival = crossing closes CLOSE_BEFORE_MIN before arrival
+  for (const arr of arrivals) {
+    const planned = new Date(arr.plannedWhen || arr.when);
+    const actual = new Date(arr.when || arr.plannedWhen);
+    if (isNaN(actual)) continue;
+    events.push({ type: 'arr', time: actual, planned });
+  }
+
+  // Build closure windows
+  const rawClosures = events.map(ev => {
+    const closeStart = new Date(ev.time.getTime() - CLOSE_BEFORE_MIN * 60 * 1000);
+    const closeEnd = new Date(ev.time.getTime() + OPEN_AFTER_SEC * 1000);
+    return { start: closeStart, end: closeEnd, trainTime: ev.time };
+  });
+
+  // Merge overlapping windows
+  rawClosures.sort((a, b) => a.start - b.start);
+  const merged = [];
+  for (const c of rawClosures) {
+    if (merged.length && c.start <= merged[merged.length - 1].end) {
+      merged[merged.length - 1].end = new Date(Math.max(merged[merged.length - 1].end, c.end));
+    } else {
+      merged.push({ ...c });
+    }
+  }
+
+  // Filter to window
+  const windowEnd = new Date(now.getTime() + WINDOW_HOURS * 60 * 60 * 1000);
+  return merged.filter(c => c.end > now && c.start < windowEnd);
+}
+
+// ── MAIN LOAD ──
+async function loadData() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('error-msg').style.display = 'none';
+
+  try {
+    closures = await fetchTrains();
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('main-content').style.display = 'block';
+    renderAll();
+    scheduleNotifications();
+    startTimer();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'block';
+  }
+}
+
+// ── RENDER ──
+function renderAll() {
+  renderHero();
+  renderTimeline();
+  renderList();
+}
+
+function renderHero() {
+  const now = new Date();
+  const statusMain = document.getElementById('status-main');
+  const statusCountdown = document.getElementById('status-countdown');
+  const nextEvent = document.getElementById('next-event');
+  const hero = document.getElementById('hero');
+
+  const current = closures.find(c => c.start <= now && c.end >= now);
+  const next = closures.find(c => c.start > now);
+
+  if (current) {
+    // CLOSED
+    statusMain.textContent = 'GESCHLOSSEN';
+    statusMain.className = 'status-main closed';
+    statusCountdown.className = 'status-countdown closed';
+    hero.style.setProperty('--hero-glow', '#ff2d2d44');
+    document.body.style.setProperty('--current-bg', '#1a0000');
+
+    const secsLeft = Math.max(0, Math.floor((current.end - now) / 1000));
+    statusCountdown.textContent = `Öffnet in ${formatSeconds(secsLeft)}`;
+
+    if (next) {
+      nextEvent.textContent = `Nächste Schließung: ${formatTime(next.start)}`;
+    } else {
+      nextEvent.textContent = '';
+    }
+  } else {
+    // OPEN
+    statusMain.textContent = 'OFFEN';
+    statusMain.className = 'status-main open';
+    statusCountdown.className = 'status-countdown open';
+    hero.style.setProperty('--hero-glow', '#00e67622');
+
+    if (next) {
+      const secsUntil = Math.max(0, Math.floor((next.start - now) / 1000));
+      statusCountdown.textContent = `Schließt in ${formatSeconds(secsUntil)}`;
+      nextEvent.textContent = `${formatTime(next.start)} – ${formatTime(next.end)}`;
+    } else {
+      statusCountdown.textContent = 'Keine Züge';
+      nextEvent.textContent = '';
+    }
+  }
+}
+
+function renderTimeline() {
+  const bar = document.getElementById('timeline-bar');
+  const labels = document.getElementById('timeline-labels');
+  bar.innerHTML = '';
+  labels.innerHTML = '';
+
+  const now = new Date();
+  const windowStart = new Date(now.getTime() - 10 * 60 * 1000); // 10 min ago
+  const windowEnd = new Date(now.getTime() + WINDOW_HOURS * 60 * 60 * 1000);
+  const totalMs = windowEnd - windowStart;
+
+  // Red segments
+  for (const c of closures) {
+    const left = Math.max(0, (c.start - windowStart) / totalMs * 100);
+    const right = Math.min(100, (c.end - windowStart) / totalMs * 100);
+    if (right <= 0 || left >= 100) continue;
+    const seg = document.createElement('div');
+    seg.className = 'timeline-segment closed-seg';
+    seg.style.left = left + '%';
+    seg.style.width = (right - left) + '%';
+    bar.appendChild(seg);
+  }
+
+  // Now line
+  const nowPct = (now - windowStart) / totalMs * 100;
+  const nowLine = document.createElement('div');
+  nowLine.className = 'timeline-segment now-line';
+  nowLine.style.left = nowPct + '%';
+  bar.appendChild(nowLine);
+
+  // Labels
+  const labelTimes = [windowStart];
+  for (let i = 1; i <= WINDOW_HOURS; i++) {
+    labelTimes.push(new Date(now.getTime() + i * 60 * 60 * 1000));
+  }
+  for (const t of labelTimes) {
+    const span = document.createElement('span');
+    span.textContent = formatTime(t);
+    labels.appendChild(span);
+  }
+}
+
+function renderList() {
+  const list = document.getElementById('closures-list');
+  list.innerHTML = '';
+  const now = new Date();
+
+  if (closures.length === 0) {
+    list.innerHTML = '<div class="empty-state">KEINE SCHLIESSUNGEN</div>';
+    return;
+  }
+
+  for (const c of closures) {
+    const isPast = c.end < now;
+    const isNow = c.start <= now && c.end >= now;
+    const isUpcoming = c.start > now;
+
+    const item = document.createElement('div');
+    item.className = 'closure-item';
+
+    const dot = document.createElement('div');
+    dot.className = 'closure-dot ' + (isNow ? 'is-now' : isUpcoming ? 'upcoming' : 'past');
+
+    const info = document.createElement('div');
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'closure-time' + (isPast ? ' past' : '');
+    timeDiv.textContent = `${formatTime(c.start)} – ${formatTime(c.end)}`;
+
+    const durDiv = document.createElement('div');
+    durDiv.className = 'closure-duration';
+    const durSec = Math.round((c.end - c.start) / 1000);
+    durDiv.textContent = `ca. ${formatSeconds(durSec)}`;
+
+    info.appendChild(timeDiv);
+    info.appendChild(durDiv);
+
+    const badge = document.createElement('div');
+    badge.className = 'closure-badge ' + (isNow ? 'jetzt' : isUpcoming ? 'bald' : 'vorbei');
+    badge.textContent = isNow ? 'JETZT' : isUpcoming ? 'BALD' : 'VORBEI';
+
+    item.appendChild(dot);
+    item.appendChild(info);
+    item.appendChild(badge);
+    list.appendChild(item);
+  }
+}
+
+// ── TIMER ──
+function startTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    renderHero();
+    // Re-render list every 30s
+    if (new Date().getSeconds() % 30 === 0) renderList();
+    // Auto-reload data every 5 minutes
+    if (new Date().getSeconds() === 0 && new Date().getMinutes() % 5 === 0) loadData();
+  }, 1000);
+}
+
+// ── NOTIFICATIONS ──
+async function toggleNotifications() {
+  if (notifEnabled) {
+    notifEnabled = false;
+    clearScheduledNotifs();
+    document.getElementById('notif-btn').textContent = 'Aktivieren';
+    document.getElementById('notif-btn').className = '';
+    return;
+  }
+
+  if (!('Notification' in window)) {
+    alert('Benachrichtigungen werden auf diesem Gerät nicht unterstützt.');
+    return;
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    notifEnabled = true;
+    document.getElementById('notif-btn').textContent = 'Aktiv ✓';
+    document.getElementById('notif-btn').className = 'active';
+    scheduleNotifications();
+  } else {
+    alert('Benachrichtigungen wurden nicht erlaubt.');
+  }
+}
+
+function scheduleNotifications() {
+  if (!notifEnabled) return;
+  clearScheduledNotifs();
+
+  const now = new Date();
+  for (const c of closures) {
+    const notifTime = new Date(c.start.getTime() - NOTIF_BEFORE_MIN * 60 * 1000);
+    const msUntil = notifTime - now;
+    if (msUntil < 0 || msUntil > WINDOW_HOURS * 60 * 60 * 1000) continue;
+
+    const t = setTimeout(() => {
+      new Notification('🚧 Schranke schließt bald', {
+        body: `In ${NOTIF_BEFORE_MIN} Minuten: ${formatTime(c.start)} – ${formatTime(c.end)}`,
+        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🚧</text></svg>'
+      });
+    }, msUntil);
+
+    scheduledNotifs.push(t);
+  }
+}
+
+function clearScheduledNotifs() {
+  scheduledNotifs.forEach(clearTimeout);
+  scheduledNotifs = [];
+}
+
+// ── HELPERS ──
+function formatTime(date) {
+  return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatSeconds(secs) {
+  if (secs <= 0) return '0:00';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// ── INSTALL HINT ──
+function checkInstallHint() {
+  const isStandalone = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if (!isStandalone) {
+    document.getElementById('install-hint').style.display = 'block';
+  }
+}
+
+// ── INIT ──
+checkInstallHint();
+loadData();
+</script>
+
+</body>
+</html>
