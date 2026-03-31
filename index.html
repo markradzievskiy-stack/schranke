@@ -204,7 +204,7 @@ function startTimer(){
     renderHero();
     const s=new Date().getSeconds();
     if(s%30===0)renderList();
-    if(s===0&&new Date().getMinutes()%5===0)loadData();
+    if(s===0)loadData();
   },1000);
 }
 
