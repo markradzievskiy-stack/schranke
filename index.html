@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="de">
 <head>
 <meta charset="UTF-8">
@@ -9,379 +8,76 @@
 <meta name="apple-mobile-web-app-title" content="Schranke">
 <meta name="theme-color" content="#0a0a0a">
 <title>Schranke – Mitscherlichstraße</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0a0a0a;
-    --surface: #111111;
-    --border: #222222;
-    --red: #ff2d2d;
-    --red-dim: #4a0000;
-    --green: #00e676;
-    --green-dim: #003318;
-    --yellow: #ffb300;
-    --text: #f0f0f0;
-    --muted: #555;
-    --font-mono: 'JetBrains Mono', monospace;
-    --font-display: 'Syne', sans-serif;
+    --bg: #0a0a0a; --surface: #111; --border: #222;
+    --red: #ff2d2d; --red-dim: #4a0000;
+    --green: #00e676; --green-dim: #003318;
+    --yellow: #ffb300; --text: #f0f0f0; --muted: #555;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Syne', sans-serif;
   }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { background:var(--bg); color:var(--text); font-family:var(--mono); min-height:100dvh; overflow-x:hidden; padding-bottom:env(safe-area-inset-bottom); }
 
-- { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  #header { display:flex; align-items:center; justify-content:space-between; padding:calc(16px + env(safe-area-inset-top)) 24px 0; }
+  .app-title { font-family:var(--display); font-size:13px; font-weight:800; letter-spacing:3px; text-transform:uppercase; color:var(--muted); }
+  .refresh-btn { background:var(--surface); border:1px solid var(--border); color:var(--muted); padding:8px 14px; border-radius:6px; font-family:var(--mono); font-size:11px; letter-spacing:1px; cursor:pointer; }
+  .refresh-btn:active { background:var(--border); color:var(--text); }
 
-body {
-background: var(–bg);
-color: var(–text);
-font-family: var(–font-mono);
-min-height: 100vh;
-min-height: 100dvh;
-overflow-x: hidden;
-padding-bottom: env(safe-area-inset-bottom);
-}
+  #hero { position:relative; padding:50px 24px 36px; text-align:center; overflow:hidden; }
+  #hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 80% 60% at 50% 0%, var(--glow,#4a000044) 0%, transparent 70%); pointer-events:none; transition:background 0.8s; }
+  .status-label { font-family:var(--display); font-size:11px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
+  .status-main { font-family:var(--display); font-size:52px; font-weight:800; line-height:1; letter-spacing:-2px; margin-bottom:10px; transition:color 0.5s; }
+  .status-main.closed { color:var(--red); }
+  .status-main.open { color:var(--green); }
+  .status-countdown { font-family:var(--mono); font-size:28px; font-weight:700; letter-spacing:2px; min-height:38px; transition:color 0.5s; }
+  .status-countdown.closed { color:var(--red); }
+  .status-countdown.open { color:var(--green); }
+  .next-info { margin-top:10px; font-size:12px; color:var(--muted); letter-spacing:1px; }
 
-/* ── STATUS HERO ── */
-#hero {
-position: relative;
-padding: 60px 24px 40px;
-text-align: center;
-overflow: hidden;
-}
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(.8)} }
+  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+  .dot { display:inline-block; animation:blink 1.4s infinite; }
+  .dot:nth-child(2){animation-delay:.2s}
+  .dot:nth-child(3){animation-delay:.4s}
 
-#hero::before {
-content: ‘’;
-position: absolute;
-inset: 0;
-background: radial-gradient(ellipse 80% 60% at 50% 0%, var(–hero-glow, #4a000066) 0%, transparent 70%);
-pointer-events: none;
-transition: background 0.8s ease;
-}
+  #notif-bar { margin:0 24px 12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:6px; display:flex; align-items:center; justify-content:space-between; font-size:11px; letter-spacing:1px; color:var(--muted); }
+  #notif-btn { background:var(--border); color:var(--text); border:none; padding:6px 12px; border-radius:4px; font-family:var(--mono); font-size:10px; letter-spacing:1px; cursor:pointer; }
+  #notif-btn.active { background:var(--green-dim); color:var(--green); border:1px solid var(--green); }
 
-.status-label {
-font-family: var(–font-display);
-font-size: 11px;
-font-weight: 700;
-letter-spacing: 4px;
-text-transform: uppercase;
-color: var(–muted);
-margin-bottom: 16px;
-}
+  #loading { text-align:center; padding:40px 24px; color:var(--muted); font-size:12px; letter-spacing:2px; }
+  #error-msg { display:none; text-align:center; padding:20px 24px; color:var(--red); font-size:12px; line-height:2; }
 
-.status-main {
-font-family: var(–font-display);
-font-size: 52px;
-font-weight: 800;
-line-height: 1;
-letter-spacing: -2px;
-margin-bottom: 8px;
-transition: color 0.5s ease;
-}
+  .section-title { font-family:var(--display); font-size:10px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:var(--muted); margin-bottom:14px; padding-top:22px; border-top:1px solid var(--border); }
+  .divider { height:1px; background:var(--border); margin:0 24px; }
 
-.status-main.closed { color: var(–red); }
-.status-main.open { color: var(–green); }
+  #timeline-section { padding:0 24px 20px; }
+  #timeline-bar { position:relative; height:48px; background:var(--surface); border-radius:6px; overflow:hidden; border:1px solid var(--border); margin-bottom:8px; }
+  .tseg { position:absolute; top:0; height:100%; }
+  .tseg.red { background:var(--red); opacity:.85; }
+  .tseg.now { width:2px; background:#fff; opacity:.9; z-index:10; }
+  #timeline-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); }
 
-.status-countdown {
-font-family: var(–font-mono);
-font-size: 28px;
-font-weight: 700;
-letter-spacing: 2px;
-min-height: 40px;
-transition: color 0.5s ease;
-}
+  #list-section { padding:0 24px 50px; }
+  .closure-item { display:flex; align-items:center; gap:14px; padding:15px 0; border-bottom:1px solid var(--border); }
+  .closure-item:last-child { border-bottom:none; }
+  .cdot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .cdot.now { background:var(--red); box-shadow:0 0 8px var(--red); animation:pulse 1s infinite; }
+  .cdot.soon { background:var(--yellow); }
+  .cdot.past { background:var(--muted); }
+  .ctime { font-size:15px; font-weight:700; letter-spacing:1px; }
+  .ctime.past { color:var(--muted); }
+  .cdur { font-size:11px; color:var(--muted); margin-top:2px; }
+  .cbadge { margin-left:auto; font-size:10px; font-weight:700; letter-spacing:2px; padding:4px 10px; border-radius:4px; text-transform:uppercase; white-space:nowrap; }
+  .cbadge.jetzt { background:var(--red-dim); color:var(--red); border:1px solid var(--red); }
+  .cbadge.bald { background:#332200; color:var(--yellow); border:1px solid var(--yellow); }
+  .cbadge.vorbei { color:var(--muted); border:1px solid var(--border); }
+  .empty { padding:40px 0; text-align:center; color:var(--muted); font-size:12px; letter-spacing:2px; }
 
-.status-countdown.closed { color: var(–red); }
-.status-countdown.open { color: var(–green); }
-
-.next-event {
-margin-top: 12px;
-font-size: 12px;
-color: var(–muted);
-letter-spacing: 1px;
-}
-
-/* ── INDICATOR DOTS ── */
-.indicator {
-display: inline-block;
-width: 10px;
-height: 10px;
-border-radius: 50%;
-margin-right: 6px;
-vertical-align: middle;
-}
-.indicator.closed {
-background: var(–red);
-box-shadow: 0 0 12px var(–red);
-animation: pulse-red 1s ease-in-out infinite;
-}
-.indicator.open {
-background: var(–green);
-box-shadow: 0 0 12px var(–green);
-}
-
-@keyframes pulse-red {
-0%, 100% { opacity: 1; transform: scale(1); }
-50% { opacity: 0.6; transform: scale(0.8); }
-}
-
-/* ── TIMELINE ── */
-#timeline-section {
-padding: 0 24px 24px;
-}
-
-.section-title {
-font-family: var(–font-display);
-font-size: 10px;
-font-weight: 700;
-letter-spacing: 4px;
-text-transform: uppercase;
-color: var(–muted);
-margin-bottom: 16px;
-padding-top: 24px;
-border-top: 1px solid var(–border);
-}
-
-#timeline-bar {
-position: relative;
-height: 48px;
-background: var(–surface);
-border-radius: 6px;
-overflow: hidden;
-border: 1px solid var(–border);
-margin-bottom: 8px;
-}
-
-.timeline-segment {
-position: absolute;
-top: 0;
-height: 100%;
-transition: opacity 0.3s;
-}
-
-.timeline-segment.closed-seg {
-background: var(–red);
-opacity: 0.85;
-}
-
-.timeline-segment.now-line {
-width: 2px;
-background: white;
-opacity: 0.9;
-z-index: 10;
-}
-
-.timeline-labels {
-display: flex;
-justify-content: space-between;
-font-size: 10px;
-color: var(–muted);
-letter-spacing: 1px;
-}
-
-/* ── LIST ── */
-#list-section {
-padding: 0 24px 40px;
-}
-
-.closure-item {
-display: flex;
-align-items: center;
-gap: 16px;
-padding: 16px 0;
-border-bottom: 1px solid var(–border);
-}
-
-.closure-item:last-child { border-bottom: none; }
-
-.closure-dot {
-width: 8px;
-height: 8px;
-border-radius: 50%;
-flex-shrink: 0;
-}
-
-.closure-dot.is-now {
-background: var(–red);
-box-shadow: 0 0 8px var(–red);
-animation: pulse-red 1s ease-in-out infinite;
-}
-
-.closure-dot.upcoming { background: var(–yellow); }
-.closure-dot.past { background: var(–muted); }
-
-.closure-time {
-font-size: 15px;
-font-weight: 700;
-letter-spacing: 1px;
-color: var(–text);
-min-width: 110px;
-}
-
-.closure-time.past { color: var(–muted); }
-
-.closure-duration {
-font-size: 11px;
-color: var(–muted);
-margin-top: 2px;
-}
-
-.closure-badge {
-margin-left: auto;
-font-size: 10px;
-font-weight: 700;
-letter-spacing: 2px;
-padding: 4px 10px;
-border-radius: 4px;
-text-transform: uppercase;
-}
-
-.closure-badge.jetzt {
-background: var(–red-dim);
-color: var(–red);
-border: 1px solid var(–red);
-}
-
-.closure-badge.bald {
-background: #332200;
-color: var(–yellow);
-border: 1px solid var(–yellow);
-}
-
-.closure-badge.vorbei {
-background: transparent;
-color: var(–muted);
-border: 1px solid var(–border);
-}
-
-/* ── HEADER ── */
-#header {
-display: flex;
-align-items: center;
-justify-content: space-between;
-padding: 16px 24px 0;
-padding-top: calc(16px + env(safe-area-inset-top));
-}
-
-.app-title {
-font-family: var(–font-display);
-font-size: 13px;
-font-weight: 800;
-letter-spacing: 3px;
-text-transform: uppercase;
-color: var(–muted);
-}
-
-.refresh-btn {
-background: var(–surface);
-border: 1px solid var(–border);
-color: var(–muted);
-padding: 8px 14px;
-border-radius: 6px;
-font-family: var(–font-mono);
-font-size: 11px;
-letter-spacing: 1px;
-cursor: pointer;
-transition: all 0.2s;
-}
-
-.refresh-btn:active {
-background: var(–border);
-color: var(–text);
-}
-
-/* ── LOADING / ERROR ── */
-#loading {
-text-align: center;
-padding: 60px 24px;
-color: var(–muted);
-font-size: 13px;
-letter-spacing: 2px;
-}
-
-.loading-dots::after {
-content: ‘’;
-animation: dots 1.5s steps(4, end) infinite;
-}
-
-@keyframes dots {
-0%   { content: ‘’; }
-25%  { content: ‘.’; }
-50%  { content: ‘..’; }
-75%  { content: ‘…’; }
-100% { content: ‘’; }
-}
-
-#error-msg {
-display: none;
-text-align: center;
-padding: 20px 24px;
-color: var(–red);
-font-size: 12px;
-letter-spacing: 1px;
-}
-
-/* ── NOTIFICATION TOGGLE ── */
-#notif-bar {
-margin: 0 24px 8px;
-padding: 12px 16px;
-background: var(–surface);
-border: 1px solid var(–border);
-border-radius: 6px;
-display: flex;
-align-items: center;
-justify-content: space-between;
-font-size: 11px;
-letter-spacing: 1px;
-color: var(–muted);
-}
-
-#notif-btn {
-background: var(–border);
-color: var(–text);
-border: none;
-padding: 6px 12px;
-border-radius: 4px;
-font-family: var(–font-mono);
-font-size: 10px;
-letter-spacing: 1px;
-cursor: pointer;
-transition: all 0.2s;
-}
-
-#notif-btn.active {
-background: var(–green-dim);
-color: var(–green);
-border: 1px solid var(–green);
-}
-
-/* ── DIVIDER ── */
-.divider {
-height: 1px;
-background: var(–border);
-margin: 0 24px;
-}
-
-/* ── INSTALL HINT ── */
-#install-hint {
-display: none;
-margin: 0 24px 16px;
-padding: 12px 16px;
-background: #001a33;
-border: 1px solid #004080;
-border-radius: 6px;
-font-size: 11px;
-color: #4da6ff;
-letter-spacing: 0.5px;
-line-height: 1.6;
-}
-
-.empty-state {
-padding: 40px 0;
-text-align: center;
-color: var(–muted);
-font-size: 12px;
-letter-spacing: 2px;
-}
+  #install { display:none; margin:0 24px 12px; padding:12px 16px; background:#001a33; border:1px solid #004080; border-radius:6px; font-size:11px; color:#4da6ff; line-height:1.6; }
 </style>
-
 </head>
 <body>
 
@@ -390,182 +86,135 @@ letter-spacing: 2px;
   <button class="refresh-btn" onclick="loadData()">↻ Aktualisieren</button>
 </div>
 
-<div id="install-hint">
-  📱 Zum Startbildschirm hinzufügen: Teilen → „Zum Home-Bildschirm"
-</div>
+<div id="install">📱 Zum Startbildschirm: Teilen → „Zum Home-Bildschirm"</div>
 
 <div id="hero">
   <div class="status-label">Mitscherlichstraße</div>
-  <div class="status-main" id="status-main">–</div>
-  <div class="status-countdown" id="status-countdown">Lade<span class="loading-dots"></span></div>
-  <div class="next-event" id="next-event"></div>
+  <div class="status-main" id="s-main">–</div>
+  <div class="status-countdown" id="s-count">Lade<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+  <div class="next-info" id="s-next"></div>
 </div>
 
 <div id="notif-bar">
   <span>Benachrichtigungen (10 Min vorher)</span>
-  <button id="notif-btn" onclick="toggleNotifications()">Aktivieren</button>
+  <button id="notif-btn" onclick="toggleNotif()">Aktivieren</button>
 </div>
 
-<div id="loading">Lade Zugdaten<span class="loading-dots"></span></div>
-<div id="error-msg">⚠ Fehler beim Laden der Daten</div>
+<div id="loading">Lade Zugdaten<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
+<div id="error-msg"></div>
 
-<div id="main-content" style="display:none">
+<div id="content" style="display:none">
   <div id="timeline-section">
     <div class="section-title">Nächste 3 Stunden</div>
     <div id="timeline-bar"></div>
-    <div class="timeline-labels" id="timeline-labels"></div>
+    <div id="timeline-labels"></div>
   </div>
-
   <div class="divider"></div>
-
   <div id="list-section">
     <div class="section-title">Schließzeiten</div>
-    <div id="closures-list"></div>
+    <div id="list"></div>
   </div>
 </div>
 
 <script>
-// ── CONFIG ──
-const STATION_ID = '8000252'; // Wilhelmshaven Hbf
-const CLOSE_BEFORE_MIN = 3;   // Schranke schließt 3 Min vor Zug
-const OPEN_AFTER_SEC = 10;    // Schranke öffnet 10 Sek nach Zug
-const NOTIF_BEFORE_MIN = 10;  // Benachrichtigung 10 Min vorher
-const WINDOW_HOURS = 3;
+const PROXY = 'https://schranke-proxy.markradzievskiy.workers.dev';
+const STATION = '8000252';
+const CLOSE_BEFORE = 3 * 60 * 1000; // 3 min
+const OPEN_AFTER = 10 * 1000;        // 10 sec
+const NOTIF_BEFORE = 10 * 60 * 1000; // 10 min
+const HOURS = 3;
 
-let closures = [];
-let timerInterval = null;
-let notifEnabled = false;
-let scheduledNotifs = [];
+let closures = [], timer = null, notifOn = false, notifTimers = [];
 
-// ── FETCH TRAIN DATA ──
-async function fetchTrains() {
-  const now = new Date();
-  const durationMin = WINDOW_HOURS * 60 + 30;
-
-  // Fetch both departures and arrivals
-  const [depRes, arrRes] = await Promise.all([
-    fetch(`https://v6.db.transport.rest/stops/${STATION_ID}/departures?duration=${durationMin}&results=50&bus=false&ferry=false&subway=false&tram=false&taxi=false`),
-    fetch(`https://v6.db.transport.rest/stops/${STATION_ID}/arrivals?duration=${durationMin}&results=50&bus=false&ferry=false&subway=false&tram=false&taxi=false`)
-  ]);
-
-  if (!depRes.ok || !arrRes.ok) throw new Error('API Fehler');
-
-  const depData = await depRes.json();
-  const arrData = await arrRes.json();
-
-  const departures = (depData.departures || []).filter(t => t.line && t.line.mode === 'train');
-  const arrivals = (arrData.arrivals || []).filter(t => t.line && t.line.mode === 'train');
-
-  let events = [];
-
-  // Each departure = crossing closes CLOSE_BEFORE_MIN before planned departure
-  for (const dep of departures) {
-    const planned = new Date(dep.plannedWhen || dep.when);
-    const actual = new Date(dep.when || dep.plannedWhen);
-    if (isNaN(actual)) continue;
-    // For departure: train passes crossing when leaving
-    const crossingTime = actual;
-    events.push({ type: 'dep', time: crossingTime, planned });
-  }
-
-  // Each arrival = crossing closes CLOSE_BEFORE_MIN before arrival
-  for (const arr of arrivals) {
-    const planned = new Date(arr.plannedWhen || arr.when);
-    const actual = new Date(arr.when || arr.plannedWhen);
-    if (isNaN(actual)) continue;
-    events.push({ type: 'arr', time: actual, planned });
-  }
-
-  // Build closure windows
-  const rawClosures = events.map(ev => {
-    const closeStart = new Date(ev.time.getTime() - CLOSE_BEFORE_MIN * 60 * 1000);
-    const closeEnd = new Date(ev.time.getTime() + OPEN_AFTER_SEC * 1000);
-    return { start: closeStart, end: closeEnd, trainTime: ev.time };
-  });
-
-  // Merge overlapping windows
-  rawClosures.sort((a, b) => a.start - b.start);
-  const merged = [];
-  for (const c of rawClosures) {
-    if (merged.length && c.start <= merged[merged.length - 1].end) {
-      merged[merged.length - 1].end = new Date(Math.max(merged[merged.length - 1].end, c.end));
-    } else {
-      merged.push({ ...c });
-    }
-  }
-
-  // Filter to window
-  const windowEnd = new Date(now.getTime() + WINDOW_HOURS * 60 * 60 * 1000);
-  return merged.filter(c => c.end > now && c.start < windowEnd);
+function proxyUrl(url) {
+  return `${PROXY}?url=${encodeURIComponent(url)}`;
 }
 
-// ── MAIN LOAD ──
 async function loadData() {
   document.getElementById('loading').style.display = 'block';
-  document.getElementById('main-content').style.display = 'none';
+  document.getElementById('content').style.display = 'none';
   document.getElementById('error-msg').style.display = 'none';
 
   try {
-    closures = await fetchTrains();
+    const dur = HOURS * 60 + 30;
+    const base = `https://v6.db.transport.rest/stops/${STATION}`;
+    const [dRes, aRes] = await Promise.all([
+      fetch(proxyUrl(`${base}/departures?duration=${dur}&results=60&bus=false&ferry=false&subway=false&tram=false&taxi=false`)),
+      fetch(proxyUrl(`${base}/arrivals?duration=${dur}&results=60&bus=false&ferry=false&subway=false&tram=false&taxi=false`))
+    ]);
+
+    const dData = await dRes.json();
+    const aData = await aRes.json();
+
+    const now = new Date();
+    const trains = [
+      ...(dData.departures || []),
+      ...(aData.arrivals || [])
+    ].filter(t => t?.line?.mode === 'train');
+
+    const events = trains.map(t => new Date(t.when || t.plannedWhen)).filter(t => !isNaN(t));
+
+    const raw = events.map(t => ({
+      start: new Date(t - CLOSE_BEFORE),
+      end: new Date(t.getTime() + OPEN_AFTER)
+    }));
+
+    raw.sort((a, b) => a.start - b.start);
+    const merged = [];
+    for (const c of raw) {
+      if (merged.length && c.start <= merged[merged.length-1].end) {
+        merged[merged.length-1].end = new Date(Math.max(merged[merged.length-1].end, c.end));
+      } else merged.push({...c});
+    }
+
+    const wEnd = new Date(now.getTime() + HOURS * 3600000);
+    closures = merged.filter(c => c.end > now && c.start < wEnd);
+
     document.getElementById('loading').style.display = 'none';
-    document.getElementById('main-content').style.display = 'block';
-    renderAll();
-    scheduleNotifications();
+    document.getElementById('content').style.display = 'block';
+    render();
+    scheduleNotifs();
     startTimer();
-  } catch (e) {
+  } catch(e) {
     console.error(e);
     document.getElementById('loading').style.display = 'none';
-    document.getElementById('error-msg').style.display = 'block';
+    const el = document.getElementById('error-msg');
+    el.style.display = 'block';
+    el.innerHTML = `⚠ Fehler beim Laden<br><small style="color:#333">${e.message}</small><br><br><button onclick="loadData()" style="background:#222;border:1px solid #333;color:#aaa;padding:8px 16px;border-radius:4px;font-family:monospace;cursor:pointer">↻ Erneut</button>`;
   }
 }
 
-// ── RENDER ──
-function renderAll() {
-  renderHero();
-  renderTimeline();
-  renderList();
-}
+function render() { renderHero(); renderTimeline(); renderList(); }
 
 function renderHero() {
   const now = new Date();
-  const statusMain = document.getElementById('status-main');
-  const statusCountdown = document.getElementById('status-countdown');
-  const nextEvent = document.getElementById('next-event');
+  const cur = closures.find(c => c.start <= now && c.end >= now);
+  const nxt = closures.find(c => c.start > now);
   const hero = document.getElementById('hero');
+  const sm = document.getElementById('s-main');
+  const sc = document.getElementById('s-count');
+  const sn = document.getElementById('s-next');
 
-  const current = closures.find(c => c.start <= now && c.end >= now);
-  const next = closures.find(c => c.start > now);
-
-  if (current) {
-    // CLOSED
-    statusMain.textContent = 'GESCHLOSSEN';
-    statusMain.className = 'status-main closed';
-    statusCountdown.className = 'status-countdown closed';
-    hero.style.setProperty('--hero-glow', '#ff2d2d44');
-    document.body.style.setProperty('--current-bg', '#1a0000');
-
-    const secsLeft = Math.max(0, Math.floor((current.end - now) / 1000));
-    statusCountdown.textContent = `Öffnet in ${formatSeconds(secsLeft)}`;
-
-    if (next) {
-      nextEvent.textContent = `Nächste Schließung: ${formatTime(next.start)}`;
-    } else {
-      nextEvent.textContent = '';
-    }
+  if (cur) {
+    sm.textContent = 'GESCHLOSSEN';
+    sm.className = 'status-main closed';
+    sc.className = 'status-countdown closed';
+    hero.style.setProperty('--glow', '#ff2d2d44');
+    const s = Math.max(0, Math.floor((cur.end - now) / 1000));
+    sc.textContent = `Öffnet in ${fmt(s)}`;
+    sn.textContent = nxt ? `Nächste Schließung: ${fmtT(nxt.start)}` : '';
   } else {
-    // OPEN
-    statusMain.textContent = 'OFFEN';
-    statusMain.className = 'status-main open';
-    statusCountdown.className = 'status-countdown open';
-    hero.style.setProperty('--hero-glow', '#00e67622');
-
-    if (next) {
-      const secsUntil = Math.max(0, Math.floor((next.start - now) / 1000));
-      statusCountdown.textContent = `Schließt in ${formatSeconds(secsUntil)}`;
-      nextEvent.textContent = `${formatTime(next.start)} – ${formatTime(next.end)}`;
+    sm.textContent = 'OFFEN';
+    sm.className = 'status-main open';
+    sc.className = 'status-countdown open';
+    hero.style.setProperty('--glow', '#00e67622');
+    if (nxt) {
+      const s = Math.max(0, Math.floor((nxt.start - now) / 1000));
+      sc.textContent = `Schließt in ${fmt(s)}`;
+      sn.textContent = `${fmtT(nxt.start)} – ${fmtT(nxt.end)}`;
     } else {
-      statusCountdown.textContent = 'Keine Züge';
-      nextEvent.textContent = '';
+      sc.textContent = 'Keine Züge';
+      sn.textContent = '';
     }
   }
 }
@@ -573,179 +222,99 @@ function renderHero() {
 function renderTimeline() {
   const bar = document.getElementById('timeline-bar');
   const labels = document.getElementById('timeline-labels');
-  bar.innerHTML = '';
-  labels.innerHTML = '';
-
+  bar.innerHTML = ''; labels.innerHTML = '';
   const now = new Date();
-  const windowStart = new Date(now.getTime() - 10 * 60 * 1000); // 10 min ago
-  const windowEnd = new Date(now.getTime() + WINDOW_HOURS * 60 * 60 * 1000);
-  const totalMs = windowEnd - windowStart;
+  const ws = new Date(now - 10*60000);
+  const we = new Date(now.getTime() + HOURS*3600000);
+  const total = we - ws;
 
-  // Red segments
   for (const c of closures) {
-    const left = Math.max(0, (c.start - windowStart) / totalMs * 100);
-    const right = Math.min(100, (c.end - windowStart) / totalMs * 100);
-    if (right <= 0 || left >= 100) continue;
-    const seg = document.createElement('div');
-    seg.className = 'timeline-segment closed-seg';
-    seg.style.left = left + '%';
-    seg.style.width = (right - left) + '%';
-    bar.appendChild(seg);
+    const l = Math.max(0, (c.start-ws)/total*100);
+    const r = Math.min(100, (c.end-ws)/total*100);
+    if (r<=0||l>=100) continue;
+    const s = document.createElement('div');
+    s.className = 'tseg red';
+    s.style.left = l+'%'; s.style.width = (r-l)+'%';
+    bar.appendChild(s);
   }
+  const nl = document.createElement('div');
+  nl.className = 'tseg now';
+  nl.style.left = ((now-ws)/total*100)+'%';
+  bar.appendChild(nl);
 
-  // Now line
-  const nowPct = (now - windowStart) / totalMs * 100;
-  const nowLine = document.createElement('div');
-  nowLine.className = 'timeline-segment now-line';
-  nowLine.style.left = nowPct + '%';
-  bar.appendChild(nowLine);
-
-  // Labels
-  const labelTimes = [windowStart];
-  for (let i = 1; i <= WINDOW_HOURS; i++) {
-    labelTimes.push(new Date(now.getTime() + i * 60 * 60 * 1000));
-  }
-  for (const t of labelTimes) {
-    const span = document.createElement('span');
-    span.textContent = formatTime(t);
-    labels.appendChild(span);
-  }
+  [ws, ...Array.from({length:HOURS},(_,i)=>new Date(now.getTime()+(i+1)*3600000))].forEach(t=>{
+    const s = document.createElement('span'); s.textContent = fmtT(t); labels.appendChild(s);
+  });
 }
 
 function renderList() {
-  const list = document.getElementById('closures-list');
+  const list = document.getElementById('list');
   list.innerHTML = '';
   const now = new Date();
-
-  if (closures.length === 0) {
-    list.innerHTML = '<div class="empty-state">KEINE SCHLIESSUNGEN</div>';
-    return;
-  }
-
+  if (!closures.length) { list.innerHTML='<div class="empty">KEINE SCHLIESSUNGEN</div>'; return; }
   for (const c of closures) {
-    const isPast = c.end < now;
-    const isNow = c.start <= now && c.end >= now;
-    const isUpcoming = c.start > now;
-
-    const item = document.createElement('div');
-    item.className = 'closure-item';
-
-    const dot = document.createElement('div');
-    dot.className = 'closure-dot ' + (isNow ? 'is-now' : isUpcoming ? 'upcoming' : 'past');
-
+    const isNow = c.start<=now && c.end>=now;
+    const isPast = c.end<now;
+    const item = document.createElement('div'); item.className='closure-item';
+    const dot = document.createElement('div'); dot.className='cdot '+(isNow?'now':isPast?'past':'soon');
     const info = document.createElement('div');
-    const timeDiv = document.createElement('div');
-    timeDiv.className = 'closure-time' + (isPast ? ' past' : '');
-    timeDiv.textContent = `${formatTime(c.start)} – ${formatTime(c.end)}`;
-
-    const durDiv = document.createElement('div');
-    durDiv.className = 'closure-duration';
-    const durSec = Math.round((c.end - c.start) / 1000);
-    durDiv.textContent = `ca. ${formatSeconds(durSec)}`;
-
-    info.appendChild(timeDiv);
-    info.appendChild(durDiv);
-
-    const badge = document.createElement('div');
-    badge.className = 'closure-badge ' + (isNow ? 'jetzt' : isUpcoming ? 'bald' : 'vorbei');
-    badge.textContent = isNow ? 'JETZT' : isUpcoming ? 'BALD' : 'VORBEI';
-
-    item.appendChild(dot);
-    item.appendChild(info);
-    item.appendChild(badge);
+    const t = document.createElement('div'); t.className='ctime'+(isPast?' past':''); t.textContent=`${fmtT(c.start)} – ${fmtT(c.end)}`;
+    const d = document.createElement('div'); d.className='cdur'; d.textContent=`ca. ${fmt(Math.round((c.end-c.start)/1000))}`;
+    info.appendChild(t); info.appendChild(d);
+    const b = document.createElement('div'); b.className='cbadge '+(isNow?'jetzt':isPast?'vorbei':'bald');
+    b.textContent = isNow?'JETZT':isPast?'VORBEI':'BALD';
+    item.appendChild(dot); item.appendChild(info); item.appendChild(b);
     list.appendChild(item);
   }
 }
 
-// ── TIMER ──
 function startTimer() {
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = setInterval(() => {
+  if (timer) clearInterval(timer);
+  timer = setInterval(() => {
     renderHero();
-    // Re-render list every 30s
-    if (new Date().getSeconds() % 30 === 0) renderList();
-    // Auto-reload data every 5 minutes
-    if (new Date().getSeconds() === 0 && new Date().getMinutes() % 5 === 0) loadData();
+    const s = new Date().getSeconds();
+    if (s%30===0) renderList();
+    if (s===0 && new Date().getMinutes()%5===0) loadData();
   }, 1000);
 }
 
-// ── NOTIFICATIONS ──
-async function toggleNotifications() {
-  if (notifEnabled) {
-    notifEnabled = false;
-    clearScheduledNotifs();
-    document.getElementById('notif-btn').textContent = 'Aktivieren';
-    document.getElementById('notif-btn').className = '';
+async function toggleNotif() {
+  if (notifOn) {
+    notifOn=false; notifTimers.forEach(clearTimeout); notifTimers=[];
+    document.getElementById('notif-btn').textContent='Aktivieren';
+    document.getElementById('notif-btn').className='';
     return;
   }
-
-  if (!('Notification' in window)) {
-    alert('Benachrichtigungen werden auf diesem Gerät nicht unterstützt.');
-    return;
-  }
-
-  const permission = await Notification.requestPermission();
-  if (permission === 'granted') {
-    notifEnabled = true;
-    document.getElementById('notif-btn').textContent = 'Aktiv ✓';
-    document.getElementById('notif-btn').className = 'active';
-    scheduleNotifications();
-  } else {
-    alert('Benachrichtigungen wurden nicht erlaubt.');
+  if (!('Notification' in window)) { alert('Nicht unterstützt.'); return; }
+  const p = await Notification.requestPermission();
+  if (p==='granted') {
+    notifOn=true;
+    document.getElementById('notif-btn').textContent='Aktiv ✓';
+    document.getElementById('notif-btn').className='active';
+    scheduleNotifs();
   }
 }
 
-function scheduleNotifications() {
-  if (!notifEnabled) return;
-  clearScheduledNotifs();
-
+function scheduleNotifs() {
+  if (!notifOn) return;
+  notifTimers.forEach(clearTimeout); notifTimers=[];
   const now = new Date();
   for (const c of closures) {
-    const notifTime = new Date(c.start.getTime() - NOTIF_BEFORE_MIN * 60 * 1000);
-    const msUntil = notifTime - now;
-    if (msUntil < 0 || msUntil > WINDOW_HOURS * 60 * 60 * 1000) continue;
-
-    const t = setTimeout(() => {
-      new Notification('🚧 Schranke schließt bald', {
-        body: `In ${NOTIF_BEFORE_MIN} Minuten: ${formatTime(c.start)} – ${formatTime(c.end)}`,
-        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🚧</text></svg>'
-      });
-    }, msUntil);
-
-    scheduledNotifs.push(t);
+    const ms = new Date(c.start - NOTIF_BEFORE) - now;
+    if (ms<0||ms>HOURS*3600000) continue;
+    notifTimers.push(setTimeout(()=>{
+      new Notification('🚧 Schranke schließt bald',{body:`In 10 Min: ${fmtT(c.start)} – ${fmtT(c.end)}`});
+    }, ms));
   }
 }
 
-function clearScheduledNotifs() {
-  scheduledNotifs.forEach(clearTimeout);
-  scheduledNotifs = [];
-}
+function fmt(s) { if(s<=0)return'0:00'; return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`; }
+function fmtT(d) { return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}); }
 
-// ── HELPERS ──
-function formatTime(date) {
-  return date.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
-}
+if (!(navigator.standalone||matchMedia('(display-mode:standalone)').matches))
+  document.getElementById('install').style.display='block';
 
-function formatSeconds(secs) {
-  if (secs <= 0) return '0:00';
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
-
-// ── INSTALL HINT ──
-function checkInstallHint() {
-  const isStandalone = window.navigator.standalone === true ||
-    window.matchMedia('(display-mode: standalone)').matches;
-  if (!isStandalone) {
-    document.getElementById('install-hint').style.display = 'block';
-  }
-}
-
-// ── INIT ──
-checkInstallHint();
 loadData();
 </script>
-
 </body>
 </html>
