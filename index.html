@@ -201,11 +201,27 @@ function renderList(){
 function startTimer(){
   if(timer)clearInterval(timer);
   timer=setInterval(()=>{
-    renderHero();
-    const s=new Date().getSeconds();
+    const now=new Date();
+    const s=now.getSeconds();
+    const cur=closures.find(c=>c.start<=now&&c.end>=now);
+    const nxt=closures.find(c=>c.start>now);
+    const sc=document.getElementById('s-count');
+    const sn=document.getElementById('s-next');
+    const wasClosed=document.getElementById('s-main').className.includes('closed');
+    const isClosed=!!cur;
+    if(wasClosed!==isClosed){renderHero();}
+    else if(cur){
+      sc.textContent='Öffnet in '+fmt(Math.max(0,Math.floor((cur.end-now)/1000)));
+      sn.textContent=nxt?'Nächste Schließung: '+fmtT(nxt.start):'';
+    } else if(nxt){
+      sc.textContent='Schließt in '+fmt(Math.max(0,Math.floor((nxt.start-now)/1000)));
+      sn.textContent=fmtT(nxt.start)+' – '+fmtT(nxt.end);
+    } else {
+      sc.textContent='Keine Züge';
+      sn.textContent='';
+    }
     if(s%30===0)renderList();
-    if(s===0)if(notifOn){document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';}
-loadData();
+    if(s===0&&now.getMinutes()%3===0)loadData();
   },1000);
 }
 
