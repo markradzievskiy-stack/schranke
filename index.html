@@ -87,6 +87,11 @@ const OPEN_AFTER=10*1000;
 const NOTIF_BEFORE=10*60*1000;
 const HOURS=3;
 let closures=[],timer=null,notifOn=localStorage.getItem("notif")==="1",notifTimers=[];
+let lastDataHash='';
+
+function hashClosures(arr){
+  return arr.map(c=>c.start.getTime()+'_'+c.end.getTime()).join('|');
+}
 
 async function loadData(){
   document.getElementById('loading').style.display='block';
@@ -113,10 +118,15 @@ async function loadData(){
       else merged.push({...c});
     }
     const wEnd=new Date(now.getTime()+HOURS*3600000);
-    closures=merged.filter(c=>c.end>now&&c.start<wEnd);
+    const newClosures=merged.filter(c=>c.end>now&&c.start<wEnd);
+    const newHash=hashClosures(newClosures);
+    const changed=newHash!==lastDataHash;
+    lastDataHash=newHash;
+    closures=newClosures;
     document.getElementById('loading').style.display='none';
     document.getElementById('content').style.display='block';
-    render();scheduleNotifs();startTimer();
+    if(changed){render();scheduleNotifs();}
+    if(!timer)startTimer();
   }catch(e){
     console.error(e);
     document.getElementById('loading').style.display='none';
@@ -220,7 +230,7 @@ function startTimer(){
       sc.textContent='Keine Züge';
       sn.textContent='';
     }
-    if(s%30===0)renderList();
+    // list updated only on data reload
     if(s===0&&now.getMinutes()%3===0)loadData();
   },1000);
 }
