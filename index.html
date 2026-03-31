@@ -10,99 +10,63 @@
 <title>Schranke – Mitscherlichstraße</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700;800&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0a0a0a; --surface: #111; --border: #222;
-    --red: #ff2d2d; --red-dim: #4a0000;
-    --green: #00e676; --green-dim: #003318;
-    --yellow: #ffb300; --text: #f0f0f0; --muted: #555;
-    --mono: 'JetBrains Mono', monospace;
-    --display: 'Syne', sans-serif;
-  }
-  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-  body { background:var(--bg); color:var(--text); font-family:var(--mono); min-height:100dvh; overflow-x:hidden; padding-bottom:env(safe-area-inset-bottom); }
-
-  #header { display:flex; align-items:center; justify-content:space-between; padding:calc(16px + env(safe-area-inset-top)) 24px 0; }
-  .app-title { font-family:var(--display); font-size:13px; font-weight:800; letter-spacing:3px; text-transform:uppercase; color:var(--muted); }
-  .refresh-btn { background:var(--surface); border:1px solid var(--border); color:var(--muted); padding:8px 14px; border-radius:6px; font-family:var(--mono); font-size:11px; letter-spacing:1px; cursor:pointer; }
-  .refresh-btn:active { background:var(--border); color:var(--text); }
-
-  #hero { position:relative; padding:50px 24px 36px; text-align:center; overflow:hidden; }
-  #hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse 80% 60% at 50% 0%, var(--glow,#4a000044) 0%, transparent 70%); pointer-events:none; transition:background 0.8s; }
-  .status-label { font-family:var(--display); font-size:11px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:var(--muted); margin-bottom:14px; }
-  .status-main { font-family:var(--display); font-size:52px; font-weight:800; line-height:1; letter-spacing:-2px; margin-bottom:10px; transition:color 0.5s; }
-  .status-main.closed { color:var(--red); }
-  .status-main.open { color:var(--green); }
-  .status-countdown { font-family:var(--mono); font-size:28px; font-weight:700; letter-spacing:2px; min-height:38px; transition:color 0.5s; }
-  .status-countdown.closed { color:var(--red); }
-  .status-countdown.open { color:var(--green); }
-  .next-info { margin-top:10px; font-size:12px; color:var(--muted); letter-spacing:1px; }
-
-  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(.8)} }
-  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
-  .dot { display:inline-block; animation:blink 1.4s infinite; }
-  .dot:nth-child(2){animation-delay:.2s}
-  .dot:nth-child(3){animation-delay:.4s}
-
-  #notif-bar { margin:0 24px 12px; padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:6px; display:flex; align-items:center; justify-content:space-between; font-size:11px; letter-spacing:1px; color:var(--muted); }
-  #notif-btn { background:var(--border); color:var(--text); border:none; padding:6px 12px; border-radius:4px; font-family:var(--mono); font-size:10px; letter-spacing:1px; cursor:pointer; }
-  #notif-btn.active { background:var(--green-dim); color:var(--green); border:1px solid var(--green); }
-
-  #loading { text-align:center; padding:40px 24px; color:var(--muted); font-size:12px; letter-spacing:2px; }
-  #error-msg { display:none; text-align:center; padding:20px 24px; color:var(--red); font-size:12px; line-height:2; }
-
-  .section-title { font-family:var(--display); font-size:10px; font-weight:700; letter-spacing:4px; text-transform:uppercase; color:var(--muted); margin-bottom:14px; padding-top:22px; border-top:1px solid var(--border); }
-  .divider { height:1px; background:var(--border); margin:0 24px; }
-
-  #timeline-section { padding:0 24px 20px; }
-  #timeline-bar { position:relative; height:48px; background:var(--surface); border-radius:6px; overflow:hidden; border:1px solid var(--border); margin-bottom:8px; }
-  .tseg { position:absolute; top:0; height:100%; }
-  .tseg.red { background:var(--red); opacity:.85; }
-  .tseg.now { width:2px; background:#fff; opacity:.9; z-index:10; }
-  #timeline-labels { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); }
-
-  #list-section { padding:0 24px 50px; }
-  .closure-item { display:flex; align-items:center; gap:14px; padding:15px 0; border-bottom:1px solid var(--border); }
-  .closure-item:last-child { border-bottom:none; }
-  .cdot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-  .cdot.now { background:var(--red); box-shadow:0 0 8px var(--red); animation:pulse 1s infinite; }
-  .cdot.soon { background:var(--yellow); }
-  .cdot.past { background:var(--muted); }
-  .ctime { font-size:15px; font-weight:700; letter-spacing:1px; }
-  .ctime.past { color:var(--muted); }
-  .cdur { font-size:11px; color:var(--muted); margin-top:2px; }
-  .cbadge { margin-left:auto; font-size:10px; font-weight:700; letter-spacing:2px; padding:4px 10px; border-radius:4px; text-transform:uppercase; white-space:nowrap; }
-  .cbadge.jetzt { background:var(--red-dim); color:var(--red); border:1px solid var(--red); }
-  .cbadge.bald { background:#332200; color:var(--yellow); border:1px solid var(--yellow); }
-  .cbadge.vorbei { color:var(--muted); border:1px solid var(--border); }
-  .empty { padding:40px 0; text-align:center; color:var(--muted); font-size:12px; letter-spacing:2px; }
-
-  #install { display:none; margin:0 24px 12px; padding:12px 16px; background:#001a33; border:1px solid #004080; border-radius:6px; font-size:11px; color:#4da6ff; line-height:1.6; }
+  :root{--bg:#0a0a0a;--surface:#111;--border:#222;--red:#ff2d2d;--red-dim:#4a0000;--green:#00e676;--green-dim:#003318;--yellow:#ffb300;--text:#f0f0f0;--muted:#555;--mono:'JetBrains Mono',monospace;--display:'Syne',sans-serif}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100dvh;overflow-x:hidden;padding-bottom:env(safe-area-inset-bottom)}
+  #header{display:flex;align-items:center;justify-content:space-between;padding:calc(16px + env(safe-area-inset-top)) 24px 0}
+  .app-title{font-family:var(--display);font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:var(--muted)}
+  .refresh-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);padding:8px 14px;border-radius:6px;font-family:var(--mono);font-size:11px;cursor:pointer}
+  #hero{position:relative;padding:50px 24px 36px;text-align:center;overflow:hidden}
+  #hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,var(--glow,#4a000044) 0%,transparent 70%);pointer-events:none;transition:background .8s}
+  .status-label{font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+  .status-main{font-family:var(--display);font-size:52px;font-weight:800;line-height:1;letter-spacing:-2px;margin-bottom:10px;transition:color .5s}
+  .status-main.closed{color:var(--red)}.status-main.open{color:var(--green)}
+  .status-countdown{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:2px;min-height:38px}
+  .status-countdown.closed{color:var(--red)}.status-countdown.open{color:var(--green)}
+  .next-info{margin-top:10px;font-size:12px;color:var(--muted);letter-spacing:1px}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.8)}}
+  @keyframes blink{0%,80%,100%{opacity:0}40%{opacity:1}}
+  .dot{display:inline-block;animation:blink 1.4s infinite}.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
+  #notif-bar{margin:0 24px 12px;padding:12px 16px;background:var(--surface);border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--muted)}
+  #notif-btn{background:var(--border);color:var(--text);border:none;padding:6px 12px;border-radius:4px;font-family:var(--mono);font-size:10px;cursor:pointer}
+  #notif-btn.active{background:var(--green-dim);color:var(--green);border:1px solid var(--green)}
+  #loading{text-align:center;padding:40px 24px;color:var(--muted);font-size:12px;letter-spacing:2px}
+  #error-msg{display:none;text-align:center;padding:20px 24px;color:var(--red);font-size:12px;line-height:2}
+  .section-title{font-family:var(--display);font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;padding-top:22px;border-top:1px solid var(--border)}
+  .divider{height:1px;background:var(--border);margin:0 24px}
+  #timeline-section{padding:0 24px 20px}
+  #timeline-bar{position:relative;height:48px;background:var(--surface);border-radius:6px;overflow:hidden;border:1px solid var(--border);margin-bottom:8px}
+  .tseg{position:absolute;top:0;height:100%}.tseg.red{background:var(--red);opacity:.85}.tseg.now{width:2px;background:#fff;opacity:.9;z-index:10}
+  #timeline-labels{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+  #list-section{padding:0 24px 50px}
+  .closure-item{display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--border)}.closure-item:last-child{border-bottom:none}
+  .cdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}.cdot.now{background:var(--red);box-shadow:0 0 8px var(--red);animation:pulse 1s infinite}.cdot.soon{background:var(--yellow)}.cdot.past{background:var(--muted)}
+  .ctime{font-size:15px;font-weight:700;letter-spacing:1px}.ctime.past{color:var(--muted)}
+  .cdur{font-size:11px;color:var(--muted);margin-top:2px}
+  .cbadge{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:2px;padding:4px 10px;border-radius:4px;text-transform:uppercase;white-space:nowrap}
+  .cbadge.jetzt{background:var(--red-dim);color:var(--red);border:1px solid var(--red)}.cbadge.bald{background:#332200;color:var(--yellow);border:1px solid var(--yellow)}.cbadge.vorbei{color:var(--muted);border:1px solid var(--border)}
+  .empty{padding:40px 0;text-align:center;color:var(--muted);font-size:12px;letter-spacing:2px}
+  #install{display:none;margin:0 24px 12px;padding:12px 16px;background:#001a33;border:1px solid #004080;border-radius:6px;font-size:11px;color:#4da6ff;line-height:1.6}
 </style>
 </head>
 <body>
-
 <div id="header">
   <div class="app-title">Schranke</div>
   <button class="refresh-btn" onclick="loadData()">↻ Aktualisieren</button>
 </div>
-
 <div id="install">📱 Zum Startbildschirm: Teilen → „Zum Home-Bildschirm"</div>
-
 <div id="hero">
   <div class="status-label">Mitscherlichstraße</div>
   <div class="status-main" id="s-main">–</div>
   <div class="status-countdown" id="s-count">Lade<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
   <div class="next-info" id="s-next"></div>
 </div>
-
 <div id="notif-bar">
   <span>Benachrichtigungen (10 Min vorher)</span>
   <button id="notif-btn" onclick="toggleNotif()">Aktivieren</button>
 </div>
-
 <div id="loading">Lade Zugdaten<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>
 <div id="error-msg"></div>
-
 <div id="content" style="display:none">
   <div id="timeline-section">
     <div class="section-title">Nächste 3 Stunden</div>
@@ -115,203 +79,157 @@
     <div id="list"></div>
   </div>
 </div>
-
 <script>
-const PROXY = 'https://schranke-proxy.markradzievskiy.workers.dev';
-const STATION = '8000252';
-const CLOSE_BEFORE = 3 * 60 * 1000; // 3 min
-const OPEN_AFTER = 10 * 1000;        // 10 sec
-const NOTIF_BEFORE = 10 * 60 * 1000; // 10 min
-const HOURS = 3;
+const PROXY='https://schranke-proxy.markradzievskiy.workers.dev';
+const STATION='8000252';
+const CLOSE_BEFORE=3*60*1000;
+const OPEN_AFTER=10*1000;
+const NOTIF_BEFORE=10*60*1000;
+const HOURS=3;
+let closures=[],timer=null,notifOn=false,notifTimers=[];
 
-let closures = [], timer = null, notifOn = false, notifTimers = [];
-
-function proxyUrl(url) {
-  return `${PROXY}?url=${encodeURIComponent(url)}`;
-}
-
-async function loadData() {
-  document.getElementById('loading').style.display = 'block';
-  document.getElementById('content').style.display = 'none';
-  document.getElementById('error-msg').style.display = 'none';
-
-  try {
-    const dur = HOURS * 60 + 30;
-    const base = `https://v6.db.transport.rest/stops/${STATION}`;
-    const [dRes, aRes] = await Promise.all([
-      fetch(proxyUrl(`${base}/departures?duration=${dur}&results=60&bus=false&ferry=false&subway=false&tram=false&taxi=false`)),
-      fetch(proxyUrl(`${base}/arrivals?duration=${dur}&results=60&bus=false&ferry=false&subway=false&tram=false&taxi=false`))
+async function loadData(){
+  document.getElementById('loading').style.display='block';
+  document.getElementById('content').style.display='none';
+  document.getElementById('error-msg').style.display='none';
+  try{
+    const dur=HOURS*60+30;
+    const [dRes,aRes]=await Promise.all([
+      fetch(`${PROXY}/departures?station=${STATION}&dur=${dur}`),
+      fetch(`${PROXY}/arrivals?station=${STATION}&dur=${dur}`)
     ]);
-
-    const dData = await dRes.json();
-    const aData = await aRes.json();
-
-    const now = new Date();
-    const trains = [
-      ...(dData.departures || []),
-      ...(aData.arrivals || [])
-    ].filter(t => t?.line?.mode === 'train');
-
-    const events = trains.map(t => new Date(t.when || t.plannedWhen)).filter(t => !isNaN(t));
-
-    const raw = events.map(t => ({
-      start: new Date(t - CLOSE_BEFORE),
-      end: new Date(t.getTime() + OPEN_AFTER)
-    }));
-
-    raw.sort((a, b) => a.start - b.start);
-    const merged = [];
-    for (const c of raw) {
-      if (merged.length && c.start <= merged[merged.length-1].end) {
-        merged[merged.length-1].end = new Date(Math.max(merged[merged.length-1].end, c.end));
-      } else merged.push({...c});
+    let dData={},aData={};
+    try{dData=await dRes.json()}catch(e){console.warn(e)}
+    try{aData=await aRes.json()}catch(e){console.warn(e)}
+    const now=new Date();
+    const trains=[...(dData.departures||[]),...(aData.arrivals||[])].filter(t=>t?.line?.mode==='train');
+    const events=trains.map(t=>new Date(t.when||t.plannedWhen)).filter(t=>!isNaN(t));
+    const raw=events.map(t=>({start:new Date(t-CLOSE_BEFORE),end:new Date(t.getTime()+OPEN_AFTER)}));
+    raw.sort((a,b)=>a.start-b.start);
+    const merged=[];
+    for(const c of raw){
+      if(merged.length&&c.start<=merged[merged.length-1].end)
+        merged[merged.length-1].end=new Date(Math.max(merged[merged.length-1].end,c.end));
+      else merged.push({...c});
     }
-
-    const wEnd = new Date(now.getTime() + HOURS * 3600000);
-    closures = merged.filter(c => c.end > now && c.start < wEnd);
-
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('content').style.display = 'block';
-    render();
-    scheduleNotifs();
-    startTimer();
-  } catch(e) {
+    const wEnd=new Date(now.getTime()+HOURS*3600000);
+    closures=merged.filter(c=>c.end>now&&c.start<wEnd);
+    document.getElementById('loading').style.display='none';
+    document.getElementById('content').style.display='block';
+    render();scheduleNotifs();startTimer();
+  }catch(e){
     console.error(e);
-    document.getElementById('loading').style.display = 'none';
-    const el = document.getElementById('error-msg');
-    el.style.display = 'block';
-    el.innerHTML = `⚠ Fehler beim Laden<br><small style="color:#333">${e.message}</small><br><br><button onclick="loadData()" style="background:#222;border:1px solid #333;color:#aaa;padding:8px 16px;border-radius:4px;font-family:monospace;cursor:pointer">↻ Erneut</button>`;
+    document.getElementById('loading').style.display='none';
+    const el=document.getElementById('error-msg');
+    el.style.display='block';
+    el.innerHTML=`⚠ Fehler beim Laden<br><small style="color:#444">${e.message}</small><br><br><button onclick="loadData()" style="background:#222;border:1px solid #333;color:#aaa;padding:8px 16px;border-radius:4px;font-family:monospace;cursor:pointer">↻ Erneut</button>`;
   }
 }
 
-function render() { renderHero(); renderTimeline(); renderList(); }
+function render(){renderHero();renderTimeline();renderList()}
 
-function renderHero() {
-  const now = new Date();
-  const cur = closures.find(c => c.start <= now && c.end >= now);
-  const nxt = closures.find(c => c.start > now);
-  const hero = document.getElementById('hero');
-  const sm = document.getElementById('s-main');
-  const sc = document.getElementById('s-count');
-  const sn = document.getElementById('s-next');
-
-  if (cur) {
-    sm.textContent = 'GESCHLOSSEN';
-    sm.className = 'status-main closed';
-    sc.className = 'status-countdown closed';
-    hero.style.setProperty('--glow', '#ff2d2d44');
-    const s = Math.max(0, Math.floor((cur.end - now) / 1000));
-    sc.textContent = `Öffnet in ${fmt(s)}`;
-    sn.textContent = nxt ? `Nächste Schließung: ${fmtT(nxt.start)}` : '';
-  } else {
-    sm.textContent = 'OFFEN';
-    sm.className = 'status-main open';
-    sc.className = 'status-countdown open';
-    hero.style.setProperty('--glow', '#00e67622');
-    if (nxt) {
-      const s = Math.max(0, Math.floor((nxt.start - now) / 1000));
-      sc.textContent = `Schließt in ${fmt(s)}`;
-      sn.textContent = `${fmtT(nxt.start)} – ${fmtT(nxt.end)}`;
-    } else {
-      sc.textContent = 'Keine Züge';
-      sn.textContent = '';
-    }
+function renderHero(){
+  const now=new Date();
+  const cur=closures.find(c=>c.start<=now&&c.end>=now);
+  const nxt=closures.find(c=>c.start>now);
+  const hero=document.getElementById('hero');
+  const sm=document.getElementById('s-main');
+  const sc=document.getElementById('s-count');
+  const sn=document.getElementById('s-next');
+  if(cur){
+    sm.textContent='GESCHLOSSEN';sm.className='status-main closed';
+    sc.className='status-countdown closed';
+    hero.style.setProperty('--glow','#ff2d2d44');
+    sc.textContent=`Öffnet in ${fmt(Math.max(0,Math.floor((cur.end-now)/1000)))}`;
+    sn.textContent=nxt?`Nächste Schließung: ${fmtT(nxt.start)}`:'';
+  }else{
+    sm.textContent='OFFEN';sm.className='status-main open';
+    sc.className='status-countdown open';
+    hero.style.setProperty('--glow','#00e67622');
+    if(nxt){
+      sc.textContent=`Schließt in ${fmt(Math.max(0,Math.floor((nxt.start-now)/1000)))}`;
+      sn.textContent=`${fmtT(nxt.start)} – ${fmtT(nxt.end)}`;
+    }else{sc.textContent='Keine Züge';sn.textContent='';}
   }
 }
 
-function renderTimeline() {
-  const bar = document.getElementById('timeline-bar');
-  const labels = document.getElementById('timeline-labels');
-  bar.innerHTML = ''; labels.innerHTML = '';
-  const now = new Date();
-  const ws = new Date(now - 10*60000);
-  const we = new Date(now.getTime() + HOURS*3600000);
-  const total = we - ws;
-
-  for (const c of closures) {
-    const l = Math.max(0, (c.start-ws)/total*100);
-    const r = Math.min(100, (c.end-ws)/total*100);
-    if (r<=0||l>=100) continue;
-    const s = document.createElement('div');
-    s.className = 'tseg red';
-    s.style.left = l+'%'; s.style.width = (r-l)+'%';
+function renderTimeline(){
+  const bar=document.getElementById('timeline-bar');
+  const labels=document.getElementById('timeline-labels');
+  bar.innerHTML='';labels.innerHTML='';
+  const now=new Date();
+  const ws=new Date(now-10*60000);
+  const we=new Date(now.getTime()+HOURS*3600000);
+  const total=we-ws;
+  for(const c of closures){
+    const l=Math.max(0,(c.start-ws)/total*100);
+    const r=Math.min(100,(c.end-ws)/total*100);
+    if(r<=0||l>=100)continue;
+    const s=document.createElement('div');
+    s.className='tseg red';s.style.left=l+'%';s.style.width=(r-l)+'%';
     bar.appendChild(s);
   }
-  const nl = document.createElement('div');
-  nl.className = 'tseg now';
-  nl.style.left = ((now-ws)/total*100)+'%';
-  bar.appendChild(nl);
-
-  [ws, ...Array.from({length:HOURS},(_,i)=>new Date(now.getTime()+(i+1)*3600000))].forEach(t=>{
-    const s = document.createElement('span'); s.textContent = fmtT(t); labels.appendChild(s);
+  const nl=document.createElement('div');nl.className='tseg now';
+  nl.style.left=((now-ws)/total*100)+'%';bar.appendChild(nl);
+  [ws,...Array.from({length:HOURS},(_,i)=>new Date(now.getTime()+(i+1)*3600000))].forEach(t=>{
+    const s=document.createElement('span');s.textContent=fmtT(t);labels.appendChild(s);
   });
 }
 
-function renderList() {
-  const list = document.getElementById('list');
-  list.innerHTML = '';
-  const now = new Date();
-  if (!closures.length) { list.innerHTML='<div class="empty">KEINE SCHLIESSUNGEN</div>'; return; }
-  for (const c of closures) {
-    const isNow = c.start<=now && c.end>=now;
-    const isPast = c.end<now;
-    const item = document.createElement('div'); item.className='closure-item';
-    const dot = document.createElement('div'); dot.className='cdot '+(isNow?'now':isPast?'past':'soon');
-    const info = document.createElement('div');
-    const t = document.createElement('div'); t.className='ctime'+(isPast?' past':''); t.textContent=`${fmtT(c.start)} – ${fmtT(c.end)}`;
-    const d = document.createElement('div'); d.className='cdur'; d.textContent=`ca. ${fmt(Math.round((c.end-c.start)/1000))}`;
-    info.appendChild(t); info.appendChild(d);
-    const b = document.createElement('div'); b.className='cbadge '+(isNow?'jetzt':isPast?'vorbei':'bald');
-    b.textContent = isNow?'JETZT':isPast?'VORBEI':'BALD';
-    item.appendChild(dot); item.appendChild(info); item.appendChild(b);
+function renderList(){
+  const list=document.getElementById('list');list.innerHTML='';
+  const now=new Date();
+  if(!closures.length){list.innerHTML='<div class="empty">KEINE SCHLIESSUNGEN</div>';return}
+  for(const c of closures){
+    const isNow=c.start<=now&&c.end>=now;
+    const isPast=c.end<now;
+    const item=document.createElement('div');item.className='closure-item';
+    const dot=document.createElement('div');dot.className='cdot '+(isNow?'now':isPast?'past':'soon');
+    const info=document.createElement('div');
+    const t=document.createElement('div');t.className='ctime'+(isPast?' past':'');
+    t.textContent=`${fmtT(c.start)} – ${fmtT(c.end)}`;
+    const d=document.createElement('div');d.className='cdur';
+    d.textContent=`ca. ${fmt(Math.round((c.end-c.start)/1000))}`;
+    info.appendChild(t);info.appendChild(d);
+    const b=document.createElement('div');b.className='cbadge '+(isNow?'jetzt':isPast?'vorbei':'bald');
+    b.textContent=isNow?'JETZT':isPast?'VORBEI':'BALD';
+    item.appendChild(dot);item.appendChild(info);item.appendChild(b);
     list.appendChild(item);
   }
 }
 
-function startTimer() {
-  if (timer) clearInterval(timer);
-  timer = setInterval(() => {
+function startTimer(){
+  if(timer)clearInterval(timer);
+  timer=setInterval(()=>{
     renderHero();
-    const s = new Date().getSeconds();
-    if (s%30===0) renderList();
-    if (s===0 && new Date().getMinutes()%5===0) loadData();
-  }, 1000);
+    const s=new Date().getSeconds();
+    if(s%30===0)renderList();
+    if(s===0&&new Date().getMinutes()%5===0)loadData();
+  },1000);
 }
 
-async function toggleNotif() {
-  if (notifOn) {
-    notifOn=false; notifTimers.forEach(clearTimeout); notifTimers=[];
-    document.getElementById('notif-btn').textContent='Aktivieren';
-    document.getElementById('notif-btn').className='';
-    return;
-  }
-  if (!('Notification' in window)) { alert('Nicht unterstützt.'); return; }
-  const p = await Notification.requestPermission();
-  if (p==='granted') {
-    notifOn=true;
-    document.getElementById('notif-btn').textContent='Aktiv ✓';
-    document.getElementById('notif-btn').className='active';
-    scheduleNotifs();
-  }
+async function toggleNotif(){
+  if(notifOn){notifOn=false;notifTimers.forEach(clearTimeout);notifTimers=[];document.getElementById('notif-btn').textContent='Aktivieren';document.getElementById('notif-btn').className='';return}
+  if(!('Notification'in window)){alert('Nicht unterstützt.');return}
+  const p=await Notification.requestPermission();
+  if(p==='granted'){notifOn=true;document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';scheduleNotifs()}
 }
 
-function scheduleNotifs() {
-  if (!notifOn) return;
-  notifTimers.forEach(clearTimeout); notifTimers=[];
-  const now = new Date();
-  for (const c of closures) {
-    const ms = new Date(c.start - NOTIF_BEFORE) - now;
-    if (ms<0||ms>HOURS*3600000) continue;
-    notifTimers.push(setTimeout(()=>{
-      new Notification('🚧 Schranke schließt bald',{body:`In 10 Min: ${fmtT(c.start)} – ${fmtT(c.end)}`});
-    }, ms));
+function scheduleNotifs(){
+  if(!notifOn)return;
+  notifTimers.forEach(clearTimeout);notifTimers=[];
+  const now=new Date();
+  for(const c of closures){
+    const ms=new Date(c.start-NOTIF_BEFORE)-now;
+    if(ms<0||ms>HOURS*3600000)continue;
+    notifTimers.push(setTimeout(()=>{new Notification('🚧 Schranke schließt bald',{body:`In 10 Min: ${fmtT(c.start)} – ${fmtT(c.end)}`})},ms));
   }
 }
 
-function fmt(s) { if(s<=0)return'0:00'; return `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`; }
-function fmtT(d) { return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}); }
+function fmt(s){if(s<=0)return'0:00';return`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`}
+function fmtT(d){return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}
 
-if (!(navigator.standalone||matchMedia('(display-mode:standalone)').matches))
+if(!(navigator.standalone||matchMedia('(display-mode:standalone)').matches))
   document.getElementById('install').style.display='block';
 
 loadData();
