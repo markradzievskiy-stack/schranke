@@ -102,7 +102,7 @@ async function loadData(){
     try{dData=await dRes.json()}catch(e){console.warn(e)}
     try{aData=await aRes.json()}catch(e){console.warn(e)}
     const now=new Date();
-    const trains=[...(dData.departures||[]),...(aData.arrivals||[])].filter(t=>t?.line?.mode==='train');
+    const trains=[...(dData.departures||[]),...(aData.arrivals||[])].filter(t=>t && t.line && t.line.mode !== 'bus' && t.line.mode !== 'watercraft' && t.line.mode !== 'taxi');
     const events=trains.map(t=>new Date(t.when||t.plannedWhen)).filter(t=>!isNaN(t));
     const raw=events.map(t=>({start:new Date(t-CLOSE_BEFORE),end:new Date(t.getTime()+OPEN_AFTER)}));
     raw.sort((a,b)=>a.start-b.start);
