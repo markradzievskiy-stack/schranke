@@ -86,7 +86,7 @@ const CLOSE_BEFORE=3*60*1000;
 const OPEN_AFTER=10*1000;
 const NOTIF_BEFORE=10*60*1000;
 const HOURS=3;
-let closures=[],timer=null,notifOn=false,notifTimers=[];
+let closures=[],timer=null,notifOn=localStorage.getItem("notif")==="1",notifTimers=[];
 
 async function loadData(){
   document.getElementById('loading').style.display='block';
@@ -204,15 +204,16 @@ function startTimer(){
     renderHero();
     const s=new Date().getSeconds();
     if(s%30===0)renderList();
-    if(s===0)loadData();
+    if(s===0)if(notifOn){document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';}
+loadData();
   },1000);
 }
 
 async function toggleNotif(){
-  if(notifOn){notifOn=false;notifTimers.forEach(clearTimeout);notifTimers=[];document.getElementById('notif-btn').textContent='Aktivieren';document.getElementById('notif-btn').className='';return}
+  if(notifOn){notifOn=false;localStorage.setItem('notif','0');notifTimers.forEach(clearTimeout);notifTimers=[];document.getElementById('notif-btn').textContent='Aktivieren';document.getElementById('notif-btn').className='';return}
   if(!('Notification'in window)){alert('Nicht unterstützt.');return}
   const p=await Notification.requestPermission();
-  if(p==='granted'){notifOn=true;document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';scheduleNotifs()}
+  if(p==='granted'){notifOn=true;localStorage.setItem('notif','1');document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';scheduleNotifs()}
 }
 
 function scheduleNotifs(){
@@ -232,6 +233,7 @@ function fmtT(d){return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-d
 if(!(navigator.standalone||matchMedia('(display-mode:standalone)').matches))
   document.getElementById('install').style.display='block';
 
+if(notifOn){document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';}
 loadData();
 </script>
 </body>
