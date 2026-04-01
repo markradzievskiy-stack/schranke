@@ -104,6 +104,9 @@ async function loadData(){
     
     // Alle Zug-Ereignisse sammeln (Ankunft + Abfahrt)
     const events=[];
+    const cutoff=new Date(now-10*60000);
+    const windowEnd=new Date(now.getTime()+HOURS*3600000);
+    
     for(const t of trains){
       if(t.isCancelled) continue;
       
@@ -111,17 +114,20 @@ async function loadData(){
       if(t.scheduledDeparture){
         const [h,m]=t.scheduledDeparture.split(':').map(Number);
         const delay=(t.delayDeparture||0)*60*1000;
-        const base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+        let base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+        // Wenn Zeit kleiner als cutoff-3h -> morgen
+        if(base<new Date(cutoff-3*3600000)) base=new Date(base.getTime()+86400000);
         const actual=new Date(base.getTime()+delay);
-        if(actual>new Date(now-10*60000)) events.push(actual);
+        if(actual>cutoff&&actual<windowEnd) events.push(actual);
       }
       // Ankunft
       if(t.scheduledArrival){
         const [h,m]=t.scheduledArrival.split(':').map(Number);
         const delay=(t.delayArrival||0)*60*1000;
-        const base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+        let base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+        if(base<new Date(cutoff-3*3600000)) base=new Date(base.getTime()+86400000);
         const actual=new Date(base.getTime()+delay);
-        if(actual>new Date(now-10*60000)) events.push(actual);
+        if(actual>cutoff&&actual<windowEnd) events.push(actual);
       }
     }
 
