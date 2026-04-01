@@ -19,7 +19,7 @@
   #hero{position:relative;padding:50px 24px 36px;text-align:center;overflow:hidden}
   #hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,var(--glow,#4a000044) 0%,transparent 70%);pointer-events:none;transition:background .8s}
   .status-label{font-family:var(--display);font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
-  .status-main{font-family:var(--display);font-size:38px;font-weight:800;line-height:1;letter-spacing:-2px;margin-bottom:10px;transition:color .5s}
+  .status-main{font-family:var(--display);font-size:38px;font-weight:800;line-height:1;letter-spacing:-1px;margin-bottom:10px;transition:color .5s}
   .status-main.closed{color:var(--red)}.status-main.open{color:var(--green)}
   .status-countdown{font-family:var(--mono);font-size:28px;font-weight:700;letter-spacing:2px;min-height:38px}
   .status-countdown.closed{color:var(--red)}.status-countdown.open{color:var(--green)}
@@ -81,48 +81,72 @@
 </div>
 <script>
 const PROXY='https://schranke-proxy.markradzievskiy.workers.dev';
-const STATION='8006445';
-const CLOSE_BEFORE=3*60*1000;
-const OPEN_AFTER=10*1000;
+const CLOSE_BEFORE=2*60*1000;   // 2 min vor Zug
+const OPEN_AFTER=15*1000;        // 15 sek nach Zug
 const NOTIF_BEFORE=10*60*1000;
 const HOURS=3;
-let closures=[],timer=null,notifOn=localStorage.getItem("notif")==="1",notifTimers=[];
-let lastDataHash='';
+const GAP_MERGE=4*60*1000;       // Lücken unter 4 min zusammenführen
 
-function hashClosures(arr){
-  return arr.map(c=>c.start.getTime()+'_'+c.end.getTime()).join('|');
-}
+let closures=[],timer=null,notifOn=localStorage.getItem('notif')==='1',notifTimers=[];
+let lastDataHash='';
+function hashClosures(arr){return arr.map(c=>c.start.getTime()+'_'+c.end.getTime()).join('|')}
 
 async function loadData(){
   document.getElementById('loading').style.display='block';
   document.getElementById('content').style.display='none';
   document.getElementById('error-msg').style.display='none';
   try{
-    const dur=HOURS*60+30;
-    const [dRes,aRes]=await Promise.all([
-      fetch(`${PROXY}/departures?station=${STATION}&dur=${dur}`),
-      fetch(`${PROXY}/arrivals?station=${STATION}&dur=${dur}`)
-    ]);
-    let dData={},aData={};
-    try{dData=await dRes.json()}catch(e){console.warn(e)}
-    try{aData=await aRes.json()}catch(e){console.warn(e)}
+    const resp=await fetch(`${PROXY}/`);
+    const data=await resp.json();
     const now=new Date();
-    const trains=[...(dData.departures||[]),...(aData.arrivals||[])].filter(t=>t && t.line && t.line.mode !== 'bus' && t.line.mode !== 'watercraft' && t.line.mode !== 'taxi');
-    const events=trains.map(t=>new Date(t.when||t.plannedWhen)).filter(t=>!isNaN(t));
-    const raw=events.map(t=>({start:new Date(t-CLOSE_BEFORE),end:new Date(t.getTime()+OPEN_AFTER)}));
+    const today=now.toISOString().slice(0,10);
+    const trains=data.departures||[];
+    
+    // Alle Zug-Ereignisse sammeln (Ankunft + Abfahrt)
+    const events=[];
+    for(const t of trains){
+      if(t.isCancelled) continue;
+      
+      // Abfahrt
+      if(t.scheduledDeparture){
+        const [h,m]=t.scheduledDeparture.split(':').map(Number);
+        const delay=(t.delayDeparture||0)*60*1000;
+        const base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+        const actual=new Date(base.getTime()+delay);
+        if(actual>new Date(now-10*60000)) events.push(actual);
+      }
+      // Ankunft
+      if(t.scheduledArrival){
+        const [h,m]=t.scheduledArrival.split(':').map(Number);
+        const delay=(t.delayArrival||0)*60*1000;
+        const base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+        const actual=new Date(base.getTime()+delay);
+        if(actual>new Date(now-10*60000)) events.push(actual);
+      }
+    }
+
+    // Schließzeiten berechnen
+    const raw=events.map(t=>({
+      start:new Date(t-CLOSE_BEFORE),
+      end:new Date(t.getTime()+OPEN_AFTER)
+    }));
     raw.sort((a,b)=>a.start-b.start);
+
+    // Zusammenführen mit GAP_MERGE
     const merged=[];
     for(const c of raw){
-      if(merged.length&&c.start<=merged[merged.length-1].end)
+      if(merged.length&&c.start.getTime()-merged[merged.length-1].end.getTime()<=GAP_MERGE){
         merged[merged.length-1].end=new Date(Math.max(merged[merged.length-1].end,c.end));
-      else merged.push({...c});
+      } else merged.push({...c});
     }
+
     const wEnd=new Date(now.getTime()+HOURS*3600000);
     const newClosures=merged.filter(c=>c.end>now&&c.start<wEnd);
     const newHash=hashClosures(newClosures);
     const changed=newHash!==lastDataHash;
     lastDataHash=newHash;
     closures=newClosures;
+
     document.getElementById('loading').style.display='none';
     document.getElementById('content').style.display='block';
     if(changed){render();scheduleNotifs();}
@@ -175,9 +199,8 @@ function renderTimeline(){
     const l=Math.max(0,(c.start-ws)/total*100);
     const r=Math.min(100,(c.end-ws)/total*100);
     if(r<=0||l>=100)continue;
-    const s=document.createElement('div');
-    s.className='tseg red';s.style.left=l+'%';s.style.width=(r-l)+'%';
-    bar.appendChild(s);
+    const s=document.createElement('div');s.className='tseg red';
+    s.style.left=l+'%';s.style.width=(r-l)+'%';bar.appendChild(s);
   }
   const nl=document.createElement('div');nl.className='tseg now';
   nl.style.left=((now-ws)/total*100)+'%';bar.appendChild(nl);
@@ -223,14 +246,10 @@ function startTimer(){
     else if(cur){
       sc.textContent='Öffnet in '+fmt(Math.max(0,Math.floor((cur.end-now)/1000)));
       sn.textContent=nxt?'Nächste Schließung: '+fmtT(nxt.start):'';
-    } else if(nxt){
+    }else if(nxt){
       sc.textContent='Schließt in '+fmt(Math.max(0,Math.floor((nxt.start-now)/1000)));
       sn.textContent=fmtT(nxt.start)+' – '+fmtT(nxt.end);
-    } else {
-      sc.textContent='Keine Züge';
-      sn.textContent='';
-    }
-    // list updated only on data reload
+    }else{sc.textContent='Keine Züge';sn.textContent='';}
     if(s===0&&now.getMinutes()%3===0)loadData();
   },1000);
 }
@@ -256,10 +275,10 @@ function scheduleNotifs(){
 function fmt(s){if(s<=0)return'0:00';return`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`}
 function fmtT(d){return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}
 
+if(notifOn){document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';}
 if(!(navigator.standalone||matchMedia('(display-mode:standalone)').matches))
   document.getElementById('install').style.display='block';
 
-if(notifOn){document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';}
 loadData();
 </script>
 </body>
