@@ -81,8 +81,14 @@
 </div>
 <script>
 const PROXY='https://schranke-proxy.markradzievskiy.workers.dev';
-const CLOSE_BEFORE=2*60*1000;   // 2 min vor Zug
-const OPEN_AFTER=15*1000;        // 15 sek nach Zug
+// Schließzeiten nach Zugtyp (Sekunden vor Zugdurchfahrt, Mittelwert aus Messungen)
+const CLOSE_BEFORE_MAP={
+  're18': 170,  // RE18: Ø 2:50
+  'rb59': 79,   // RB59: Ø 1:19
+  'rs3':  142,  // RS3:  Ø 2:22
+};
+const CLOSE_BEFORE_DEFAULT=150; // Standard 2:30
+const OPEN_AFTER=10*1000;       // 10 sek nach Zug
 const NOTIF_BEFORE=10*60*1000;
 const HOURS=3;
 const GAP_MERGE=4*60*1000;       // Lücken unter 4 min zusammenführen
@@ -110,15 +116,19 @@ async function loadData(){
     for(const t of trains){
       if(t.isCancelled) continue;
       
+      // Zugtyp ermitteln
+      const trainName=(t.train||'').toLowerCase().replace('nwb ','').replace(/\s+/g,'');
+      const closeSec=CLOSE_BEFORE_MAP[trainName]||CLOSE_BEFORE_DEFAULT;
+      const closeMs=closeSec*1000;
+
       // Abfahrt
       if(t.scheduledDeparture){
         const [h,m]=t.scheduledDeparture.split(':').map(Number);
         const delay=(t.delayDeparture||0)*60*1000;
         let base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
-        // Wenn Zeit kleiner als cutoff-3h -> morgen
         if(base<new Date(cutoff-3*3600000)) base=new Date(base.getTime()+86400000);
         const actual=new Date(base.getTime()+delay);
-        if(actual>cutoff&&actual<windowEnd) events.push(actual);
+        if(actual>cutoff&&actual<windowEnd) events.push({time:actual,closeMs});
       }
       // Ankunft
       if(t.scheduledArrival){
@@ -127,14 +137,14 @@ async function loadData(){
         let base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
         if(base<new Date(cutoff-3*3600000)) base=new Date(base.getTime()+86400000);
         const actual=new Date(base.getTime()+delay);
-        if(actual>cutoff&&actual<windowEnd) events.push(actual);
+        if(actual>cutoff&&actual<windowEnd) events.push({time:actual,closeMs});
       }
     }
 
     // Schließzeiten berechnen
-    const raw=events.map(t=>({
-      start:new Date(t-CLOSE_BEFORE),
-      end:new Date(t.getTime()+OPEN_AFTER)
+    const raw=events.map(e=>({
+      start:new Date(e.time.getTime()-e.closeMs),
+      end:new Date(e.time.getTime()+OPEN_AFTER)
     }));
     raw.sort((a,b)=>a.start-b.start);
 
