@@ -79,221 +79,329 @@
     <div id="list"></div>
   </div>
 </div>
+
 <script>
-const PROXY='https://schranke-proxy.markradzievskiy.workers.dev';
-// Schließzeiten nach Zugtyp (Sekunden vor Zugdurchfahrt, Mittelwert aus Messungen)
-const CLOSE_BEFORE_MAP={
-  're18': 170,  // RE18: Ø 2:50
-  'rb59': 79,   // RB59: Ø 1:19
-  'rs3':  142,  // RS3:  Ø 2:22
+// ═══════════════════════════════════════════════
+// KONFIGURATION
+// ═══════════════════════════════════════════════
+
+const PROXY = 'https://schranke-proxy.markradzievskiy.workers.dev/';
+const HOURS = 3;
+const GAP_MERGE = 4 * 60 * 1000; // Lücken < 4 Min zusammenführen
+const NOTIF_BEFORE = 10 * 60 * 1000;
+
+// ── ALGORITHMUS 1: ABFAHRT (Zug startet von Wilhelmshaven) ──
+// Wilhelmshaven ist Endbahnhof → Zug fährt immer pünktlich ab
+// Gemessen: Schranke schließt 1:45 vor Abfahrt
+// Zug braucht 45 Sek vom Bahnsteig bis zur Schranke
+// Schranke öffnet 10 Sek nach Zugdurchfahrt
+const DEP_CLOSE_BEFORE = 105; // Sekunden vor Abfahrtszeit
+const DEP_OPEN_AFTER   = 55;  // Sekunden nach Abfahrtszeit (45s Fahrt + 10s)
+
+// ── ALGORITHMUS 2: ANKUNFT (Zug kommt von außen) ──
+// Zug kann Verspätung haben → delay aus API verwenden
+// Gemessene Schließzeiten nach Zugtyp (Sekunden vor Ankunft an Schranke)
+const ARR_CLOSE_BEFORE = {
+  're18': 142, // RE18: Ø 2:22 (Messung: 2:15 und 2:29)
+  'rb59': 79,  // RB59: Ø 1:19 (Messung: 1:19)
+  'rs3':  142, // RS3:  Ø 2:22 (Messung: 1:20 und 3:25)
 };
-const CLOSE_BEFORE_DEFAULT=150; // Standard 2:30
-const OPEN_AFTER=10*1000;       // 10 sek nach Zug
-const NOTIF_BEFORE=10*60*1000;
-const HOURS=3;
-const GAP_MERGE=4*60*1000;       // Lücken unter 4 min zusammenführen
+const ARR_CLOSE_BEFORE_DEFAULT = 142; // Standard falls unbekannter Zugtyp
+const ARR_OPEN_AFTER = 10; // Sekunden nach Ankunft an Schranke
 
-let closures=[],timer=null,notifOn=localStorage.getItem('notif')==='1',notifTimers=[];
-let lastDataHash='';
-function hashClosures(arr){return arr.map(c=>c.start.getTime()+'_'+c.end.getTime()).join('|')}
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
 
-async function loadData(){
-  document.getElementById('loading').style.display='block';
-  document.getElementById('content').style.display='none';
-  document.getElementById('error-msg').style.display='none';
-  try{
-    const resp=await fetch(`${PROXY}/`);
-    const data=await resp.json();
-    const now=new Date();
-    const today=now.toISOString().slice(0,10);
-    const trains=data.departures||[];
-    
-    // Alle Zug-Ereignisse sammeln (Ankunft + Abfahrt)
-    const events=[];
-    const cutoff=new Date(now-10*60000);
-    const windowEnd=new Date(now.getTime()+HOURS*3600000);
-    
-    for(const t of trains){
-      if(t.isCancelled) continue;
-      
-      // Zugtyp ermitteln
-      const trainName=(t.train||'').toLowerCase().replace('nwb ','').replace(/\s+/g,'');
-      const closeSec=CLOSE_BEFORE_MAP[trainName]||CLOSE_BEFORE_DEFAULT;
-      const closeMs=closeSec*1000;
+let closures = [];
+let timer = null;
+let notifOn = localStorage.getItem('notif') === '1';
+let notifTimers = [];
+let lastDataHash = '';
 
-      // Abfahrt
-      if(t.scheduledDeparture){
-        const [h,m]=t.scheduledDeparture.split(':').map(Number);
-        const delay=(t.delayDeparture||0)*60*1000;
-        let base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
-        if(base<new Date(cutoff-3*3600000)) base=new Date(base.getTime()+86400000);
-        const actual=new Date(base.getTime()+delay);
-        if(actual>cutoff&&actual<windowEnd) events.push({time:actual,closeMs});
+// ═══════════════════════════════════════════════
+// DATEN LADEN
+// ═══════════════════════════════════════════════
+
+async function loadData() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('content').style.display = 'none';
+  document.getElementById('error-msg').style.display = 'none';
+
+  try {
+    const resp = await fetch(PROXY);
+    const data = await resp.json();
+    const trains = data.departures || [];
+
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10);
+    const cutoff = new Date(now - 10 * 60 * 1000);
+    const windowEnd = new Date(now.getTime() + HOURS * 3600000);
+
+    const raw = [];
+
+    for (const t of trains) {
+      if (t.isCancelled) continue;
+
+      const trainKey = (t.train || '').toLowerCase().replace('nwb ', '').replace(/\s+/g, '');
+
+      // ── ABFAHRT: präziser Algorithmus ──
+      if (t.scheduledDeparture) {
+        const depTime = parseTime(t.scheduledDeparture, today, t.delayDeparture || 0);
+        if (depTime && depTime > cutoff && depTime < windowEnd) {
+          raw.push({
+            start: new Date(depTime.getTime() - DEP_CLOSE_BEFORE * 1000),
+            end:   new Date(depTime.getTime() + DEP_OPEN_AFTER * 1000)
+          });
+        }
       }
-      // Ankunft
-      if(t.scheduledArrival){
-        const [h,m]=t.scheduledArrival.split(':').map(Number);
-        const delay=(t.delayArrival||0)*60*1000;
-        let base=new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
-        if(base<new Date(cutoff-3*3600000)) base=new Date(base.getTime()+86400000);
-        const actual=new Date(base.getTime()+delay);
-        if(actual>cutoff&&actual<windowEnd) events.push({time:actual,closeMs});
+
+      // ── ANKUNFT: Algorithmus nach Zugtyp ──
+      if (t.scheduledArrival) {
+        const arrTime = parseTime(t.scheduledArrival, today, t.delayArrival || 0);
+        const closeBefore = (ARR_CLOSE_BEFORE[trainKey] || ARR_CLOSE_BEFORE_DEFAULT);
+        if (arrTime && arrTime > cutoff && arrTime < windowEnd) {
+          raw.push({
+            start: new Date(arrTime.getTime() - closeBefore * 1000),
+            end:   new Date(arrTime.getTime() + ARR_OPEN_AFTER * 1000)
+          });
+        }
       }
     }
 
-    // Schließzeiten berechnen
-    const raw=events.map(e=>({
-      start:new Date(e.time.getTime()-e.closeMs),
-      end:new Date(e.time.getTime()+OPEN_AFTER)
-    }));
-    raw.sort((a,b)=>a.start-b.start);
-
-    // Zusammenführen mit GAP_MERGE
-    const merged=[];
-    for(const c of raw){
-      if(merged.length&&c.start.getTime()-merged[merged.length-1].end.getTime()<=GAP_MERGE){
-        merged[merged.length-1].end=new Date(Math.max(merged[merged.length-1].end,c.end));
-      } else merged.push({...c});
+    // Sortieren und Lücken zusammenführen
+    raw.sort((a, b) => a.start - b.start);
+    const merged = [];
+    for (const c of raw) {
+      if (merged.length && c.start.getTime() - merged[merged.length - 1].end.getTime() <= GAP_MERGE) {
+        merged[merged.length - 1].end = new Date(Math.max(merged[merged.length - 1].end, c.end));
+      } else {
+        merged.push({ ...c });
+      }
     }
 
-    const wEnd=new Date(now.getTime()+HOURS*3600000);
-    const newClosures=merged.filter(c=>c.end>now&&c.start<wEnd);
-    const newHash=hashClosures(newClosures);
-    const changed=newHash!==lastDataHash;
-    lastDataHash=newHash;
-    closures=newClosures;
+    const newClosures = merged.filter(c => c.end > now && c.start < windowEnd);
+    const newHash = newClosures.map(c => c.start.getTime() + '_' + c.end.getTime()).join('|');
+    const changed = newHash !== lastDataHash;
+    lastDataHash = newHash;
+    closures = newClosures;
 
-    document.getElementById('loading').style.display='none';
-    document.getElementById('content').style.display='block';
-    if(changed){render();scheduleNotifs();}
-    if(!timer)startTimer();
-  }catch(e){
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    if (changed) { render(); scheduleNotifs(); }
+    if (!timer) startTimer();
+
+  } catch (e) {
     console.error(e);
-    document.getElementById('loading').style.display='none';
-    const el=document.getElementById('error-msg');
-    el.style.display='block';
-    el.innerHTML=`⚠ Fehler beim Laden<br><small style="color:#444">${e.message}</small><br><br><button onclick="loadData()" style="background:#222;border:1px solid #333;color:#aaa;padding:8px 16px;border-radius:4px;font-family:monospace;cursor:pointer">↻ Erneut</button>`;
+    document.getElementById('loading').style.display = 'none';
+    const el = document.getElementById('error-msg');
+    el.style.display = 'block';
+    el.innerHTML = `⚠ Fehler beim Laden<br><small style="color:#444">${e.message}</small><br><br>
+      <button onclick="loadData()" style="background:#222;border:1px solid #333;color:#aaa;padding:8px 16px;border-radius:4px;font-family:monospace;cursor:pointer">↻ Erneut</button>`;
   }
 }
 
-function render(){renderHero();renderTimeline();renderList()}
+// ═══════════════════════════════════════════════
+// HILFSFUNKTIONEN
+// ═══════════════════════════════════════════════
 
-function renderHero(){
-  const now=new Date();
-  const cur=closures.find(c=>c.start<=now&&c.end>=now);
-  const nxt=closures.find(c=>c.start>now);
-  const hero=document.getElementById('hero');
-  const sm=document.getElementById('s-main');
-  const sc=document.getElementById('s-count');
-  const sn=document.getElementById('s-next');
-  if(cur){
-    sm.textContent='GESCHLOSSEN';sm.className='status-main closed';
-    sc.className='status-countdown closed';
-    hero.style.setProperty('--glow','#ff2d2d44');
-    sc.textContent=`Öffnet in ${fmt(Math.max(0,Math.floor((cur.end-now)/1000)))}`;
-    sn.textContent=nxt?`Nächste Schließung: ${fmtT(nxt.start)}`:'';
-  }else{
-    sm.textContent='OFFEN';sm.className='status-main open';
-    sc.className='status-countdown open';
-    hero.style.setProperty('--glow','#00e67622');
-    if(nxt){
-      sc.textContent=`Schließt in ${fmt(Math.max(0,Math.floor((nxt.start-now)/1000)))}`;
-      sn.textContent=`${fmtT(nxt.start)} – ${fmtT(nxt.end)}`;
-    }else{sc.textContent='Keine Züge';sn.textContent='';}
+function parseTime(timeStr, today, delayMin) {
+  if (!timeStr) return null;
+  const [h, m] = timeStr.split(':').map(Number);
+  let base = new Date(`${today}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`);
+  const now = new Date();
+  // Wenn Zeit weit in der Vergangenheit liegt → morgen
+  if (base < new Date(now - 4 * 3600000)) base = new Date(base.getTime() + 86400000);
+  return new Date(base.getTime() + delayMin * 60000);
+}
+
+function fmt(s) {
+  if (s <= 0) return '0:00';
+  return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
+}
+
+function fmtT(d) {
+  return d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+
+// ═══════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════
+
+function render() { renderHero(); renderTimeline(); renderList(); }
+
+function renderHero() {
+  const now = new Date();
+  const cur = closures.find(c => c.start <= now && c.end >= now);
+  const nxt = closures.find(c => c.start > now);
+  const hero = document.getElementById('hero');
+  const sm = document.getElementById('s-main');
+  const sc = document.getElementById('s-count');
+  const sn = document.getElementById('s-next');
+
+  if (cur) {
+    sm.textContent = 'GESCHLOSSEN';
+    sm.className = 'status-main closed';
+    sc.className = 'status-countdown closed';
+    hero.style.setProperty('--glow', '#ff2d2d44');
+    sc.textContent = `Öffnet in ${fmt(Math.max(0, Math.floor((cur.end - now) / 1000)))}`;
+    sn.textContent = nxt ? `Nächste Schließung: ${fmtT(nxt.start)}` : '';
+  } else {
+    sm.textContent = 'OFFEN';
+    sm.className = 'status-main open';
+    sc.className = 'status-countdown open';
+    hero.style.setProperty('--glow', '#00e67622');
+    if (nxt) {
+      sc.textContent = `Schließt in ${fmt(Math.max(0, Math.floor((nxt.start - now) / 1000)))}`;
+      sn.textContent = `${fmtT(nxt.start)} – ${fmtT(nxt.end)}`;
+    } else {
+      sc.textContent = 'Keine Züge';
+      sn.textContent = '';
+    }
   }
 }
 
-function renderTimeline(){
-  const bar=document.getElementById('timeline-bar');
-  const labels=document.getElementById('timeline-labels');
-  bar.innerHTML='';labels.innerHTML='';
-  const now=new Date();
-  const ws=new Date(now-10*60000);
-  const we=new Date(now.getTime()+HOURS*3600000);
-  const total=we-ws;
-  for(const c of closures){
-    const l=Math.max(0,(c.start-ws)/total*100);
-    const r=Math.min(100,(c.end-ws)/total*100);
-    if(r<=0||l>=100)continue;
-    const s=document.createElement('div');s.className='tseg red';
-    s.style.left=l+'%';s.style.width=(r-l)+'%';bar.appendChild(s);
+function renderTimeline() {
+  const bar = document.getElementById('timeline-bar');
+  const labels = document.getElementById('timeline-labels');
+  bar.innerHTML = ''; labels.innerHTML = '';
+  const now = new Date();
+  const ws = new Date(now - 10 * 60000);
+  const we = new Date(now.getTime() + HOURS * 3600000);
+  const total = we - ws;
+
+  for (const c of closures) {
+    const l = Math.max(0, (c.start - ws) / total * 100);
+    const r = Math.min(100, (c.end - ws) / total * 100);
+    if (r <= 0 || l >= 100) continue;
+    const s = document.createElement('div');
+    s.className = 'tseg red';
+    s.style.left = l + '%';
+    s.style.width = (r - l) + '%';
+    bar.appendChild(s);
   }
-  const nl=document.createElement('div');nl.className='tseg now';
-  nl.style.left=((now-ws)/total*100)+'%';bar.appendChild(nl);
-  [ws,...Array.from({length:HOURS},(_,i)=>new Date(now.getTime()+(i+1)*3600000))].forEach(t=>{
-    const s=document.createElement('span');s.textContent=fmtT(t);labels.appendChild(s);
+  const nl = document.createElement('div');
+  nl.className = 'tseg now';
+  nl.style.left = ((now - ws) / total * 100) + '%';
+  bar.appendChild(nl);
+
+  [ws, ...Array.from({ length: HOURS }, (_, i) => new Date(now.getTime() + (i + 1) * 3600000))].forEach(t => {
+    const s = document.createElement('span');
+    s.textContent = fmtT(t);
+    labels.appendChild(s);
   });
 }
 
-function renderList(){
-  const list=document.getElementById('list');list.innerHTML='';
-  const now=new Date();
-  if(!closures.length){list.innerHTML='<div class="empty">KEINE SCHLIESSUNGEN</div>';return}
-  for(const c of closures){
-    const isNow=c.start<=now&&c.end>=now;
-    const isPast=c.end<now;
-    const item=document.createElement('div');item.className='closure-item';
-    const dot=document.createElement('div');dot.className='cdot '+(isNow?'now':isPast?'past':'soon');
-    const info=document.createElement('div');
-    const t=document.createElement('div');t.className='ctime'+(isPast?' past':'');
-    t.textContent=`${fmtT(c.start)} – ${fmtT(c.end)}`;
-    const d=document.createElement('div');d.className='cdur';
-    d.textContent=`ca. ${fmt(Math.round((c.end-c.start)/1000))}`;
-    info.appendChild(t);info.appendChild(d);
-    const b=document.createElement('div');b.className='cbadge '+(isNow?'jetzt':isPast?'vorbei':'bald');
-    b.textContent=isNow?'JETZT':isPast?'VORBEI':'BALD';
-    item.appendChild(dot);item.appendChild(info);item.appendChild(b);
+function renderList() {
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+  const now = new Date();
+  if (!closures.length) {
+    list.innerHTML = '<div class="empty">KEINE SCHLIESSUNGEN</div>';
+    return;
+  }
+  for (const c of closures) {
+    const isNow = c.start <= now && c.end >= now;
+    const isPast = c.end < now;
+    const item = document.createElement('div'); item.className = 'closure-item';
+    const dot = document.createElement('div'); dot.className = 'cdot ' + (isNow ? 'now' : isPast ? 'past' : 'soon');
+    const info = document.createElement('div');
+    const t = document.createElement('div'); t.className = 'ctime' + (isPast ? ' past' : '');
+    t.textContent = `${fmtT(c.start)} – ${fmtT(c.end)}`;
+    const d = document.createElement('div'); d.className = 'cdur';
+    d.textContent = `ca. ${fmt(Math.round((c.end - c.start) / 1000))}`;
+    info.appendChild(t); info.appendChild(d);
+    const b = document.createElement('div'); b.className = 'cbadge ' + (isNow ? 'jetzt' : isPast ? 'vorbei' : 'bald');
+    b.textContent = isNow ? 'JETZT' : isPast ? 'VORBEI' : 'BALD';
+    item.appendChild(dot); item.appendChild(info); item.appendChild(b);
     list.appendChild(item);
   }
 }
 
-function startTimer(){
-  if(timer)clearInterval(timer);
-  timer=setInterval(()=>{
-    const now=new Date();
-    const s=now.getSeconds();
-    const cur=closures.find(c=>c.start<=now&&c.end>=now);
-    const nxt=closures.find(c=>c.start>now);
-    const sc=document.getElementById('s-count');
-    const sn=document.getElementById('s-next');
-    const wasClosed=document.getElementById('s-main').className.includes('closed');
-    const isClosed=!!cur;
-    if(wasClosed!==isClosed){renderHero();}
-    else if(cur){
-      sc.textContent='Öffnet in '+fmt(Math.max(0,Math.floor((cur.end-now)/1000)));
-      sn.textContent=nxt?'Nächste Schließung: '+fmtT(nxt.start):'';
-    }else if(nxt){
-      sc.textContent='Schließt in '+fmt(Math.max(0,Math.floor((nxt.start-now)/1000)));
-      sn.textContent=fmtT(nxt.start)+' – '+fmtT(nxt.end);
-    }else{sc.textContent='Keine Züge';sn.textContent='';}
-    if(s===0&&now.getMinutes()%3===0)loadData();
-  },1000);
+// ═══════════════════════════════════════════════
+// TIMER
+// ═══════════════════════════════════════════════
+
+function startTimer() {
+  if (timer) clearInterval(timer);
+  timer = setInterval(() => {
+    const now = new Date();
+    const s = now.getSeconds();
+    const cur = closures.find(c => c.start <= now && c.end >= now);
+    const nxt = closures.find(c => c.start > now);
+    const sc = document.getElementById('s-count');
+    const sn = document.getElementById('s-next');
+    const wasClosed = document.getElementById('s-main').className.includes('closed');
+    const isClosed = !!cur;
+
+    if (wasClosed !== isClosed) {
+      renderHero();
+    } else if (cur) {
+      sc.textContent = 'Öffnet in ' + fmt(Math.max(0, Math.floor((cur.end - now) / 1000)));
+      sn.textContent = nxt ? 'Nächste Schließung: ' + fmtT(nxt.start) : '';
+    } else if (nxt) {
+      sc.textContent = 'Schließt in ' + fmt(Math.max(0, Math.floor((nxt.start - now) / 1000)));
+      sn.textContent = fmtT(nxt.start) + ' – ' + fmtT(nxt.end);
+    } else {
+      sc.textContent = 'Keine Züge';
+      sn.textContent = '';
+    }
+
+    if (s === 0 && now.getMinutes() % 3 === 0) loadData();
+  }, 1000);
 }
 
-async function toggleNotif(){
-  if(notifOn){notifOn=false;localStorage.setItem('notif','0');notifTimers.forEach(clearTimeout);notifTimers=[];document.getElementById('notif-btn').textContent='Aktivieren';document.getElementById('notif-btn').className='';return}
-  if(!('Notification'in window)){alert('Nicht unterstützt.');return}
-  const p=await Notification.requestPermission();
-  if(p==='granted'){notifOn=true;localStorage.setItem('notif','1');document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';scheduleNotifs()}
-}
+// ═══════════════════════════════════════════════
+// BENACHRICHTIGUNGEN
+// ═══════════════════════════════════════════════
 
-function scheduleNotifs(){
-  if(!notifOn)return;
-  notifTimers.forEach(clearTimeout);notifTimers=[];
-  const now=new Date();
-  for(const c of closures){
-    const ms=new Date(c.start-NOTIF_BEFORE)-now;
-    if(ms<0||ms>HOURS*3600000)continue;
-    notifTimers.push(setTimeout(()=>{new Notification('🚧 Schranke schließt bald',{body:`In 10 Min: ${fmtT(c.start)} – ${fmtT(c.end)}`})},ms));
+async function toggleNotif() {
+  if (notifOn) {
+    notifOn = false;
+    localStorage.setItem('notif', '0');
+    notifTimers.forEach(clearTimeout); notifTimers = [];
+    document.getElementById('notif-btn').textContent = 'Aktivieren';
+    document.getElementById('notif-btn').className = '';
+    return;
+  }
+  if (!('Notification' in window)) { alert('Nicht unterstützt.'); return; }
+  const p = await Notification.requestPermission();
+  if (p === 'granted') {
+    notifOn = true;
+    localStorage.setItem('notif', '1');
+    document.getElementById('notif-btn').textContent = 'Aktiv ✓';
+    document.getElementById('notif-btn').className = 'active';
+    scheduleNotifs();
   }
 }
 
-function fmt(s){if(s<=0)return'0:00';return`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`}
-function fmtT(d){return d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})}
+function scheduleNotifs() {
+  if (!notifOn) return;
+  notifTimers.forEach(clearTimeout); notifTimers = [];
+  const now = new Date();
+  for (const c of closures) {
+    const ms = new Date(c.start - NOTIF_BEFORE) - now;
+    if (ms < 0 || ms > HOURS * 3600000) continue;
+    notifTimers.push(setTimeout(() => {
+      new Notification('🚧 Schranke schließt bald', {
+        body: `In 10 Min: ${fmtT(c.start)} – ${fmtT(c.end)}`
+      });
+    }, ms));
+  }
+}
 
-if(notifOn){document.getElementById('notif-btn').textContent='Aktiv ✓';document.getElementById('notif-btn').className='active';}
-if(!(navigator.standalone||matchMedia('(display-mode:standalone)').matches))
-  document.getElementById('install').style.display='block';
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+
+if (notifOn) {
+  document.getElementById('notif-btn').textContent = 'Aktiv ✓';
+  document.getElementById('notif-btn').className = 'active';
+}
+
+if (!(navigator.standalone || matchMedia('(display-mode:standalone)').matches)) {
+  document.getElementById('install').style.display = 'block';
+}
 
 loadData();
 </script>
